@@ -79,21 +79,7 @@ No step is skipped. Steps 2-5 can run fast — hours, not weeks — but the thin
 
 ## Agent Failure Modes
 
-Watch for these. They're the code equivalent of writing problems.
-
-**The test cheat.** Agent makes a test pass by weakening the assertion instead of fixing the code. "Assert not nil" instead of "assert equals expected value." Catch this in review.
-
-**The scope creep.** Agent was asked to build the StreakService and also refactored the data model, added a utility file, and changed the theme colors. Each task, one change.
-
-**The dependency grab.** Agent installs a package to solve a problem that's solvable in 10 lines of native code. No dependencies without explicit approval.
-
-**The confidence bluff.** Agent says "Done" but hasn't run the tests, or ran the tests and is ignoring a failure. "Done" means tests pass. Always verify.
-
-**The context amnesia.** Agent in a later session ignores or contradicts a decision from an earlier session because it's not in the current context window. This is why decisions live in files, not conversation.
-
-**The ghost refactor.** Agent rewrites working code to match its preferred style. If the code works and tests pass, leave it alone unless the task explicitly says refactor.
-
-**The heresy.** A rejected idea left as a fragment in one document gets picked up by a later agent and built into the project alongside the chosen approach. Two competing implementations emerge. The fix: every Hard Kill decision triggers an immediate purge of all references across all documents and code. See `agent-failure-modes.md` for the full protocol.
+See `agent-failure-modes.md` for the full catalog with detection methods. The current list: Test Cheat, Scope Creep, Dependency Grab, Confidence Bluff, Context Amnesia, Ghost Refactor, Premature Abstraction, Loop of Despair, Heresy, Precondition Ghost, Architecture Mirror, Lossy Middleman, Closed-Loop Build, Clean Slate Bias, Unoptimized Default. When a new failure mode is observed during a build, add it to the file before the next session.
 
 ## File Conventions
 
@@ -125,6 +111,3 @@ Every role in this system produces insights, not just outputs. Two forms, used i
 
 Weather reporting ("this was complex") is not an insight. An insight changes what you do next.
 
-## Agent Failure Modes Growth
-
-See `agent-failure-modes.md` for the full list. When a new failure mode is observed during a build session, add it to the file before the next session. Format: name, what it is, why it happens, how to catch it. The list compounds if maintained. If it's not maintained, the same mistakes recur.

@@ -50,6 +50,46 @@ Pushback is not "this is hard so let's not do it." Pushback is structured as ins
 
 Example: "The PRD specifies six widget states keyed to time of day. **Insight:** the complexity isn't in rendering six states — it's that the timeline provider needs to know the user's notification preferences, coupling the notification system and widget system in a way that makes both harder to change independently. **Implication:** simplify to three states for v1, which breaks the coupling and lets notifications and widgets evolve separately. The user loses time-of-day specificity in the widget. The developer gains independent deployability of two subsystems."
 
+### Understand the Problem Before Architecting It
+
+Before proposing an architecture, study how the quality bar output was created — not just what it contains. If reference examples exist, ask:
+
+- What raw input produced this output?
+- What did the creator need to see *simultaneously* to generate the key insights? (A single data stream? Multiple streams interleaved? Cross-entity relationships visible only in chronological context?)
+- What is the *reasoning process* — not the output structure — that connects input to output?
+
+The architecture should recapitulate the creation process, not the output's table of contents. If the output has five sections, that doesn't mean the architecture needs five corresponding components. It means the architecture needs to support whatever process produced those five sections — which may be a single component reading all the data at once.
+
+This is the difference between classification and comprehension. Classification sorts the outputs of insight into bins. Comprehension understands how the insight was generated. An architecture built from classification mirrors the output structure. An architecture built from comprehension mirrors the creation process. Only the latter can reach the quality bar.
+
+### Trace Quality Bar Examples Through the Architecture
+
+If the project has quality bar examples — smoke tests, reference outputs, sample deliverables — these are not inspiration. They are test cases for the architecture itself.
+
+Before finalizing the architecture, pick the most complex quality bar example and trace it in two directions:
+
+**Backward (from output to data):** What specific data points, cross-references, and temporal relationships produced this example output? List them concretely: "This insight required seeing Player A's cast timeline alongside Player B's damage-taken events on the same fight, interleaved chronologically."
+
+**Forward (through the proposed architecture):** At each processing stage, is that data still present? If the architecture summarizes, categorizes, or compresses the data before it reaches the component that produces the final output, verify that the compression preserves every data point and relationship identified in the backward trace.
+
+If the data reaching the final stage is insufficient to reproduce the quality bar example, the architecture cannot hit the quality bar. This is not a bug to fix later — it's a structural limitation that requires rethinking the approach before task decomposition begins.
+
+**When the trace fails:** The SWE revises the architecture and the affected sections of the XRD go through peer review again. If the failure is a cost-quality tradeoff (e.g., the architecture can hit the bar but at significantly higher cost), surface it to the Product Maker as a Tier 3 item — the Product Maker decides cost-quality tradeoffs, the SWE does not. If the failure is structural (no revision of the current approach can preserve the required data), escalate to the human with the trace evidence: what data the quality bar requires, where the architecture loses it, and what alternative approaches exist.
+
+When the architecture makes a cost-quality tradeoff — for example, compressing raw data to reduce API token cost at the expense of emergent pattern detection — surface it explicitly as an insight/implication:
+
+> "The quality bar requires the model to see raw chronological event data. The proposed architecture compresses those into categorized findings, reducing cost by ~90% but losing cross-entity temporal relationships. This is a cost-vs-quality decision for Product."
+
+Do not silently choose the cheaper architecture. The Product Maker decides cost-quality tradeoffs. The SWE surfaces them.
+
+### Reuse Before You Build
+
+Before writing a new component, search the codebase for existing solutions. Does the project already have a date formatter? A config loader? An API client wrapper? A validation utility? Extend what exists. Add a method to an existing class. Import an existing utility.
+
+The default is reuse; new code requires justifying why the existing code can't be extended.
+
+This does not mean "build abstractions so future code can reuse them." That is The Premature Abstraction (Decision #8). Reuse is about leveraging code that's already written. Abstraction is about anticipating code that might be written later. Aggressively prefer the first. Be skeptical of the second.
+
 ### Affirm What's Right
 
 Explicitly call out PRD decisions that are correct and should not be revisited. This prevents future developers (or future agents) from second-guessing choices that were already sound. State what the decision is and why it's right from an engineering perspective.

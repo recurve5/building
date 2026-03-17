@@ -26,6 +26,8 @@ Handoff: PRD is passed to the SWE for the XRD. The PRD document is the input —
 
 The SWE writes an Engineering Response Document following `swe.md`. The XRD responds to the PRD with architecture, open questions, pushback, and a build plan broken into concurrent tracks.
 
+If the project has quality bar examples (smoke tests, reference outputs, sample deliverables), the XRD must include a **Quality Bar Trace**: one concrete example traced forward through the proposed architecture to verify the output stage receives sufficient data to reproduce it. See `swe.md` for the full protocol. If the trace reveals a cost-quality tradeoff (e.g., compressing raw data to reduce API costs at the expense of output depth), the tradeoff is stated explicitly and escalated to the Product Maker before task decomposition begins.
+
 Input: PRD (the document).
 Output: XRD with architecture, open questions, build plan.
 Handoff: PRD + XRD are passed to the Peer Reviewer and the Tester simultaneously.
@@ -51,12 +53,22 @@ Transition criteria: every PRD feature section has at least one corresponding te
 
 Before writing task files, the SWE produces a `DAY-ZERO.md` document in the project root. This document contains every shared interface, schema, and convention that cross-track tasks depend on — function signatures, JSON schemas, protocol definitions, enum shapes, naming conventions. Task files may not reference a contract that isn't in DAY-ZERO.md.
 
-After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done.
+After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done. At least one task — typically an integration milestone or the final output task — must include acceptance criteria that reference the quality bar examples directly. Not "does the pipeline run?" but "does the output match the reference examples in pattern depth, cross-entity relationships, and analytical quality?" If no task's acceptance criteria mention the quality bar, the build loop is closed and the quality bar is outside it (see `agent-failure-modes.md`, "The Closed-Loop Build").
+
+After task files are written, run a **user-story walkthrough**: start from an empty directory (or an empty machine, if the project has infrastructure prerequisites) and walk through every step a developer would take to reach the first task's acceptance criteria. Every precondition — installed tools, created directories, configuration files, scaffolding — must trace to either a prior task or explicit documentation. If a precondition is orphaned (no task creates it, no doc explains it), add a task.
+
+> **Insight:** Task decomposition from the engineering perspective starts from the architecture and works down. It misses preconditions that are only visible when walking the user story from zero — project scaffolds, tool installation, configuration that "everyone knows" but no task creates.
+> **Implication:** A single walkthrough from empty directory to first working test catches an entire class of gaps that no amount of architectural review surfaces.
+> **Decision:** User-story walkthrough is a required verification step after task decomposition, before any build work begins.
+
+For existing codebases, task decomposition must also consider **deployment boundaries**. Each task should be independently deployable — shippable as its own PR without requiring other tasks to land simultaneously — or explicitly grouped with other tasks into a deployment unit. A task that can only ship bundled with three other tasks is a risk signal: it means testing and rollback are coupled across a larger surface. When a task can't be independently deployed, the task file states which other tasks it must ship with and why.
+
+**Scaling signal:** If task decomposition produces more than ~30 tasks, or if writing task files requires making architectural decisions the XRD didn't anticipate, the project may have outgrown a single XRD. The sign is that task decomposition feels like architecture work — you're deciding how subsystems interact, not just breaking known work into units. When this happens, stop decomposing. The XRD needs to be split into subsystem specs first, each with its own task set, its own DAY-ZERO contracts, and explicit contracts between subsystems. The current framework then operates per-subsystem. This is not a failure — it's the project telling you its actual shape.
 
 Input: XRD build plan + test plan + peer review resolutions.
 Output: `DAY-ZERO.md` + task files in `tasks/` directory.
 Handoff: Tasks are ready for agents to execute.
-Transition criteria: every task file references only contracts defined in DAY-ZERO.md, and every acceptance criterion maps to a test in the test plan.
+Transition criteria: every task file references only contracts defined in DAY-ZERO.md, every acceptance criterion maps to a test in the test plan, and the user-story walkthrough passes with no orphaned preconditions.
 
 ### Stage 7: Build
 
@@ -67,6 +79,38 @@ When a task is complete, the agent reports not just "done" but what it learned. 
 Input: task file + project codebase + CLAUDE.md.
 Output: working, tested code + insight/implication note.
 Handoff: Product Maker reviews the increment. Decisions Log updated if anything changed. Insight/implications feed forward into upcoming task files.
+
+## Working Against an Existing Codebase
+
+The pipeline above assumes greenfield — an empty directory, no users, no production traffic. When the project targets an existing codebase, every stage still applies, but the context is different and the risk profile is higher. You are not building from nothing. You are changing something that already works, that other people may depend on, and that you can break.
+
+### Guardrails in the Project CLAUDE.md
+
+Before any build work begins on an existing codebase, the project CLAUDE.md must include a guardrails section. This section answers:
+
+- **What is the deployment process?** How does code get from a branch to production? Who approves? What gates exist (CI, staging, manual review)?
+- **What is off-limits?** Files, directories, services, or infrastructure that this project must not touch. Name them explicitly.
+- **What is the rollback plan?** If a change breaks production, how do you undo it? Feature flags, revert commits, database rollback scripts?
+- **What is the testing baseline?** What tests already exist? What is the current pass rate? A change that reduces the pass rate is a regression, not a feature.
+- **Who else is working here?** Other developers, other agents, other active branches. Concurrent work on the same codebase requires coordination.
+
+If you don't know the answers, find out before writing the PRD. The discovery is part of Stage 1.
+
+### Discovery Before the PRD
+
+For existing codebases, the idea brief stage expands to include a codebase survey. Before the Product Maker writes the PRD, the SWE (or the same person wearing the SWE hat) maps:
+
+- **What exists** — the relevant parts of the current architecture, data model, and dependencies.
+- **What's fragile** — areas with no tests, tightly coupled components, code that hasn't been touched in a long time.
+- **What the change surface looks like** — which files and systems the proposed changes will touch. The smaller the surface, the safer the change.
+
+This survey doesn't need to be exhaustive. It needs to be honest about what you understand and what you don't. The PRD and XRD are written against this understanding, not against an assumption that you're starting clean.
+
+### Bias Toward Minimal Change
+
+In an existing codebase, the default is to touch as few files as possible and prove the change works before expanding scope. A working system has earned the benefit of the doubt. Rewrites, refactors, and structural changes require justification beyond "this could be better" — they need a concrete problem statement tied to the current project's goals.
+
+This is the existing-codebase counterpart to Decision #8 (abstractions must be earned): changes to working code must be earned too.
 
 ## Decision Kill Protocol
 
@@ -98,6 +142,14 @@ Every handoff between stages follows two rules:
 
 **Stage transitions are explicit.** When a stage is complete, the person (or agent) who completed it states: "Stage N is done. The output is [filename]. The next stage is [N+1]. The input for that stage is [list of files]." This prevents drift.
 
+## Role Independence When Agents Fill All Roles
+
+When one person or one agent plays multiple roles, each role must still produce independent judgment. The Peer Review is the most vulnerable stage — if the same agent that wrote the XRD also reviews it, the review degenerates into self-validation.
+
+**The rule:** The Peer Review must be a separate session with a separate context load. The reviewing agent reads the PRD and XRD as documents. It does not have access to the conversation or reasoning that produced them. If the same human plays Product Maker, SWE, and Peer Reviewer, each hat-change starts from the documents, not from memory of writing them.
+
+This applies to any role transition where the second role is meant to catch errors the first role introduced. SWE→Peer Reviewer, Product Maker→Tester, SWE→Tester. The independence is the value. Without it, the role is theater.
+
 ## Inter-Role Communication
 
 Roles talk to each other before escalating to the human. The human is the boss, not the bus.
@@ -115,6 +167,8 @@ When a role encounters ambiguity, contradiction, or a needed decision, the first
 **Product names a technology → SWE can override if the rationale isn't user-facing.** See `product-maker.md` for the technology-in-PRD rule. If the SWE overrides, they state the tradeoff in product terms so Product can evaluate.
 
 **SWE makes an implementation choice → includes a tradeoff statement.** Every non-trivial choice covers user-facing consequence, maintenance burden, and refactoring risk. Product reads the tradeoffs and flags what feels material. See `swe.md` for the full protocol.
+
+**Tester finds contradiction → routes to the claim owner first.** The Tester reads the PRD and XRD against behavioral expectations and is often the first to discover contradictions neither document sees on its own. If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. Contradictions that neither role can resolve escalate to the human with both positions stated. See `tester.md` for the full routing protocol.
 
 ### Escalation Criteria
 
@@ -174,3 +228,23 @@ ln -s ~/building/CLAUDE.md ~/nacre/CLAUDE.md
 ```
 
 Option B is better for most cases because the project CLAUDE.md will also contain project-specific context that differs between projects.
+
+## Writing Pipeline
+
+The code pipeline (PRD → XRD → Peer Review → Test Plan → Tasks → Build) has a parallel for prose output. Every document this system produces — PRDs, XRDs, briefs, essays, external communications — is read by humans. The writing quality bar applies.
+
+### Stages
+
+**Stage 1: Draft.** Write the document following the relevant role definition. PRDs follow `product-maker.md`. XRDs follow `swe.md`. Essays and external documents follow the writer's own structure. The draft is the thinking — get the substance right before worrying about the surface.
+
+**Stage 2: Failure modes check.** Run the draft against `writing-failure-modes.md`. The trigger: if it will be read by someone other than you, run the checklist. Fortune cookie test, friend test, em dash count, triplet audit, hedge check, register scan. Fix what the checklist catches.
+
+**Stage 3: Voice pass.** Read it aloud (or read it as if aloud). Does the voice shift where it should? Does it drone? Is the register locked? This is the pass that catches what the checklist misses — the feel of the piece, not just the patterns.
+
+**Stage 4: Publish or hand off.** The document enters the build pipeline (PRDs go to SWE, XRDs go to Peer Review) or ships externally.
+
+### Which Documents Go Through the Pipeline
+
+- **Always:** Essays, blog posts, cold outreach, anything published externally. Full pipeline, no shortcuts.
+- **Always, abbreviated:** PRDs, XRDs, Peer Reviews, test plans. Stage 2 (failure modes check) is required — these are read by developers and agents who will build from them. Unclear writing in a PRD becomes ambiguous code. Stage 3 (voice pass) is optional for internal documents but recommended when the document will be referenced across multiple sessions.
+- **Skip:** Task files, DECISIONS.md entries, OPEN-ITEMS.md notes. These are working documents. Clarity matters; polish does not.
