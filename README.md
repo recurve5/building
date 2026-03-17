@@ -10,6 +10,8 @@ This is how I build. It started from decades of product development at scale and
 
 The system is still evolving. When I see a new failure mode, I add it. When a decision protocol breaks, I fix it. The files are working documents, not a finished framework.
 
+**Star or watch this repo to get notified when files are updated.**
+
 ## The Files
 
 **[build-process.md](build-process.md)** — The full pipeline from idea to shipped code. Covers how work moves between roles, how context persists across sessions, and how decisions get logged and enforced.
