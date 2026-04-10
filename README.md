@@ -1,16 +1,24 @@
 # Building
 
-A multi-agent orchestration system for building software with AI. It defines how ideas become products through a pipeline that pressure-tests from multiple angles before a single line of code gets written — and then builds the code too.
+A judgment layer for AI-assisted software development. Seven agents, a pipeline, and a set of documents that force the thinking before the code.
 
-This started from decades of product development at scale and a few months of getting bitten by the specific ways AI agents fail. A third of this process was defined by the LLM itself. The system is still evolving. When a new failure mode appears, it gets added. When a protocol breaks in practice, it gets fixed. These are working documents, not a finished framework.
+AI agents write code fast. What they don't do is question the spec, catch contradictions from three sessions ago, or notice that the architecture makes it impossible to hit the quality bar. Those aren't model limitations. They're what happens when you skip the part where someone decides what good looks like.
 
-Star or watch this repo to get notified when files are updated.
+Building is the process layer between your idea and the code. It applies what organizations learned over decades about product development — PRDs, engineering responses, peer reviews, test plans, decision logs, role separation — to a context where a single person and a set of AI agents are doing the work.
+
+## Why This Exists
+
+AI collapsed the cost of execution without collapsing the cost of judgment. Agents write code fast and cheap, but deciding what to build, recognizing when to stop, and catching the error that looks like a feature — that didn't get cheaper. It got harder, because the speed that eliminated the effort also eliminated the thinking that used to happen as a byproduct of the effort.
+
+When you spend two weeks building something by hand, you notice problems along the way. When an agent builds it in twenty minutes, those problems still exist. You just don't find them until a user does.
+
+Building exists because the bottleneck moved. It's no longer in the typing. It's in the judgment. The pipeline is designed to make the judgment happen before the typing starts.
 
 ## How It Works
 
 Seven agents, each with a scoped role and isolated context, connected through an orchestrator that manages the pipeline. Agents do not talk to each other directly — all communication routes through the orchestrator, which enforces gates, scopes context, and routes decisions.
 
-The pipeline: **milestone decomposition** → **idea brief** → **PRD** → **XRD** → **pushback resolution** → **peer review** → **test plan** → **SDM review** (existing codebases) → **task decomposition** → **build** → **smoke test**. Stages 1-10 run per milestone, not per brief. Each milestone produces working software the user can touch and is smoke tested before the next milestone begins. Steps can be fast but they don't get skipped. The orchestrator runs end to end — planning through verified product — stopping only for gate failures or decisions that require human judgment.
+The pipeline: **milestone decomposition** → **idea brief** → **PRD** → **XRD** → **pushback resolution** → **peer review** → **test plan** → **SDM review** (existing codebases) → **task decomposition** → **build** → **smoke test**. Stages run per milestone, not per brief. Each milestone produces working software the user can touch and is smoke tested before the next milestone begins. Steps can be fast but they don't get skipped. The orchestrator runs end to end — planning through verified product — stopping only for gate failures or decisions that require human judgment.
 
 ### The Agents
 
@@ -33,6 +41,16 @@ Every choice during a build falls into one of three tiers:
 - **Tier 3 — Surface for review.** Changes to user experience or inherited constraints. Must be framed as a user story with insight/implication before reaching the human. Most items labeled Tier 3 become Tier 2 when forced through this lens.
 
 The system gets smarter over time: after each project, Tier 3 patterns where the human consistently makes the same call become Tier 2 rules.
+
+### Context Isolation
+
+Agents do not share context. This is mechanical, not behavioral. Agents trained via reinforcement learning pull context and resolve problems — when an inner-loop agent has access to outer-loop context, it re-litigates closed decisions and picks up paused work. Instructions to "stay in scope" fight the training. The constraint has to be enforced through scoped file access and fresh context windows, not through instructions the agent is incentivized to ignore.
+
+Files are the interface between agents, not shared context.
+
+## What This Isn't
+
+This is not an agent runtime. It doesn't manage processes, coordinate parallel execution, or monitor agent health. Tools that do those things well are solving a real problem at a different layer. Building operates above that layer — it's the set of documents and protocols that tell agents what to build, in what order, and how to know when it's right. You could run this pipeline on top of any agent execution layer, or with a single Claude Code session and manual orchestration, which is how it works today.
 
 ## The Files
 
@@ -97,5 +115,7 @@ A growing catalog of the specific ways AI agents fail during builds. Each entry 
 See `docs/agent-failure-modes.md` for the full catalog.
 
 ## Background
+
+This started from 27 years of product development at Amazon and a few months of getting bitten by the specific ways AI agents fail. A third of this process was defined by the LLM itself. The system is still evolving. When a new failure mode appears, it gets added. When a protocol breaks in practice, it gets fixed. These are working documents, not a finished framework.
 
 I wrote about earlier versions of this system in [CLAUDE.md isn't enough](https://open.substack.com/pub/joshbuilds/p/claudemd-isnt-enough). If you're building with AI agents and you've hit a failure mode you haven't seen written about, open an issue.
