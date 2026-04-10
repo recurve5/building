@@ -75,7 +75,7 @@ The Gate Runner is the circuit breaker. It replaces Josh reviewing every task co
 
 ### 2. The Heresy Scanner
 
-Already defined in `build-process.md` as a manual step. Automate it:
+Already defined in `docs/build-process.md` as a manual step. Automate it:
 
 - Trigger: any DECISIONS.md entry tagged `[HARD KILL]`
 - Action: search all project files for the killed idea's terminology
@@ -84,7 +84,7 @@ Already defined in `build-process.md` as a manual step. Automate it:
 
 ### 3. The Session Closer
 
-Already described in `build-process.md` as a manual step ("update the project CLAUDE.md at the end of every session"). Automate the structured parts:
+Already described in `docs/build-process.md` as a manual step ("update the project CLAUDE.md at the end of every session"). Automate the structured parts:
 
 - Append completed tasks to the project CLAUDE.md status section
 - Append new DECISIONS.md entries to the session summary
@@ -109,13 +109,15 @@ This is not a tool. It's a section in the project CLAUDE.md that gets maintained
 
 Do not build all four at once. The harness principle applies to its own evolution: encode judgment first, then automate.
 
-**Phase 1: Gate Runner.** This is the highest-value automation. It replaces synchronous review of every task with asynchronous review of failed gates only. Build it for one project. Run it for one full build cycle. Observe what it catches and what it misses. Add failure modes to `agent-failure-modes.md` based on what it misses.
+**Phase 1: Gate Runner.** This is the highest-value automation. It replaces synchronous review of every task with asynchronous review of failed gates only. Build it for one project. Run it for one full build cycle. Observe what it catches and what it misses. Add failure modes to `docs/agent-failure-modes.md` based on what it misses.
 
 **Phase 2: Heresy Scanner.** Low effort, high value. Already fully specified. Automate the search. The judgment (what constitutes a ghost reference) is already encoded in the Hard Kill protocol.
 
 **Phase 3: Session Closer.** Medium effort, medium value. The structured parts are automatable. The unstructured parts (what Josh learned, what feels off, what the next session should prioritize) remain manual. The automation handles the bookkeeping; Josh handles the judgment.
 
 **Phase 4: Async Review Queue.** Build this when the volume of OPEN-ITEMS.md entries justifies it. For a single project with sequential task execution, the current file-based approach works. For multiple concurrent projects or parallel task execution, the queue becomes necessary.
+
+**Phase 5: Automated Smoke Test.** Operational. Playwright MCP is installed globally for Claude Code (`claude mcp add --scope user playwright -- npx @playwright/mcp@latest`). The orchestrator executes the PRD's First-Use Walkthrough against the running product at Stage 10, using Playwright MCP to open the browser, navigate, click, type, read responses, and take screenshots. The agent evaluates model responses as a model — judging whether responses demonstrate real knowledge, not just checking for element presence. Failed steps become fix tasks. No custom scripting or separate test framework needed. See `prompts/smoke-test-protocol.md` for the full protocol.
 
 ## What Does Not Get Automated
 

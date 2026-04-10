@@ -11,6 +11,9 @@ Every task in the `tasks/` directory follows this format. The goal is that an ag
 **Phase:** [A1, B2, etc.]
 **Status:** [not started | in progress | done | blocked]
 **Depends on:** [task numbers that must be complete first, or "none"]
+**Context:** [files and decisions the agent should read before starting, beyond defaults]
+- Defaults (always loaded): project CLAUDE.md, DECISIONS.md, DAY-ZERO.md
+- Task-specific: [list of additional files, contracts, or decision numbers relevant to this task]
 
 ## What to Build
 
@@ -25,6 +28,8 @@ Every task in the `tasks/` directory follows this format. The goal is that an ag
 ## Contracts
 
 [If this task produces something other tasks consume, specify the interface. Function signatures, JSON schemas, protocol definitions. If this task consumes something from another task, reference where to find it.]
+
+[If any contract references an existing function or API, include the verified file path and signature. If marked [UNVERIFIED] in DAY-ZERO.md, verify the actual signature before writing code. If the signature doesn't match, stop and escalate — do not adapt the contract yourself.]
 
 ## Acceptance Criteria
 
@@ -68,6 +73,9 @@ Every task in the `tasks/` directory follows this format. The goal is that an ag
 **Phase:** A1
 **Status:** not started
 **Depends on:** Task 001 (SwiftData models), Task 002 (date utilities)
+**Context:**
+- Defaults: project CLAUDE.md, DECISIONS.md, DAY-ZERO.md
+- Task-specific: `Sources/Models/Habit.swift`, `Sources/Models/DayEntry.swift`, Decision #8 (abstractions must be earned)
 
 ## What to Build
 
@@ -122,12 +130,50 @@ Per DECISIONS.md #8, the streak is computed on read, not stored. Cache in memory
 Task 007 will add X/week streaks to StreakService. Do not implement it here.
 ```
 
+## Fix Task Variant
+
+For bug fixes originating from smoke test failures or single-issue corrections, use this lightweight format. The full template's Contracts, Deployment, and Tests sections are optional — include them only when the fix warrants a new test or touches a contract.
+
+```markdown
+# Task [NUMBER]: Fix — [SHORT DESCRIPTION]
+
+**Rework of:** [smoke test step number, or task number if fixing a prior task]
+**Status:** [not started | in progress | done | blocked]
+**Context:** [defaults plus the smoke test report and the file being fixed]
+
+## What to Fix
+
+[What's wrong, what it should be instead, and where. Reference the smoke test report's probable cause if applicable.]
+
+## Files
+
+- Modify: [files to change]
+- Do not touch: [files out of scope]
+
+## Acceptance Criteria
+
+1. [The specific behavior that proves the fix works]
+2. [Regression check — what must still work after the fix]
+
+## Execution Plan
+
+[Filled in by the agent before writing code, same as the full template.]
+
+## Completed
+
+[Date, deviations, insight/implication — same as the full template. Not optional.]
+```
+
 ## Conventions
 
+- **Dependency gate (hard).** A task whose dependencies are not all marked `done` cannot begin execution. The agent does not attempt to resolve the dependency — it reports the block and stops. This is enforced by the Peer Reviewer (see `prompts/peer-review-agent.md`, Orchestration) and is a hard gate, not a suggestion.
+- **Completion gate (hard).** A task's status cannot change to `done` without a Completed section. The Completed section includes: date, deviations from the execution plan, and an insight/implication note. A task without a Completed section is `in progress`, not `done`, regardless of whether tests pass. This gate exists because the insight/implication note is the interface between loops — inner loop insights feed middle loop synthesis (see Decision 18 in `decisions.md`). Missing insights break the signal chain.
 - A task should be completable in a single agent session. If it can't be, it needs further decomposition. If it takes less than 15 minutes, consider combining it with a related task in the same track.
 - Task files are numbered sequentially: `001-swiftdata-models.md`, `002-date-utilities.md`, `003-streak-service-daily.md`
+- **Milestone namespacing.** When a project has multiple milestones producing tasks into the same directory, task filenames include the milestone identifier as a prefix: `0.5-A-01-day-zero-contracts.md`, `0.5-B-01-embedding-service.md`. The milestone prefix prevents collisions between tasks from different milestones. For single-milestone projects or projects that archive completed milestone tasks before starting the next, the prefix is not required.
 - The number is the task ID. Reference it in "Depends on" fields.
 - Status is updated in the task file when work begins and when work completes.
 - When a task is done, add a "Completed" section with the date, any deviations from the plan, and — critically — an **Insight/Implication** note. What did building this task reveal that wasn't in the spec? What does that mean for upcoming tasks? Example: "**Insight:** the StreakService needed a special case for habits created today — the backward walk from today hits the creation date immediately, producing ambiguity about whether today counts. **Implication:** Task 007 (X/week streaks) will need a similar edge case for habits created mid-week. Add it to that task's acceptance criteria now."
+- **Decisions made during this task.** Any Tier 2 decisions made during execution. State the decision and rationale in the same format as DECISIONS.md entries. Do not write directly to DECISIONS.md — the orchestrator consolidates task-level decisions into DECISIONS.md after each wave. This prevents number collisions when tasks run in parallel.
 - Before writing code, the agent fills in the **Execution Plan** section. This is the task-level equivalent of an XRD responding to a PRD — the agent states what it understood, what it plans to do, and what it expects to produce. For simple tasks (single file, obvious approach), the execution plan can be abbreviated to 1-2 lines, but it is never skipped entirely. The plan catches misunderstandings before code is written, which is the cheapest place to catch them. If the agent's execution plan reveals ambiguity, the agent raises it before proceeding rather than guessing.
 - If the project has quality bar examples (smoke tests, reference outputs), at least one task — typically the final integration task or an output milestone — must include an acceptance criterion that compares the actual output against the reference: "Compare output against [reference file]. Verify the output captures equivalent analytical depth, cross-entity relationships, and pattern detection." If no task references the quality bar in its acceptance criteria, the build loop is closed and the quality bar is outside it.

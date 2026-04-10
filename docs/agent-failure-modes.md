@@ -8,9 +8,9 @@ Failure modes cluster by development loop timescale (per Yegge/Kim's three-loop 
 
 **Inner loop** (during task execution, seconds to minutes) — These happen while the agent is writing code. Detection during execution is cheaper than detection at the gate: **Test Cheat, Loop of Despair, Scope Creep, Ghost Refactor, Clean Slate Bias, Dependency Grab.**
 
-**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff.**
+**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.**
 
-**Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default.**
+**Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration.**
 
 ## The Test Cheat
 
@@ -99,7 +99,7 @@ Before beginning any significant build phase, run a Heresy inspection: read DECI
 
 > **Insight:** Engineering-perspective task decomposition is blind to preconditions that are only visible when walking the user story from zero. The architect sees the finished system; the developer starting on day one sees an empty directory.
 > **Implication:** A user-story walkthrough after task decomposition — starting from nothing, tracing every step to the first passing test — catches the entire class of orphaned preconditions that architectural review misses.
-> **Decision:** Added user-story walkthrough as a required verification step in Stage 6 of `build-process.md`.
+> **Decision:** Added user-story walkthrough as a required verification step in Stage 6 of `docs/build-process.md`.
 
 **How to catch it:** After writing task files, walk the user story from an empty directory through the first task's acceptance criteria. Every precondition must trace to a prior task or explicit documentation. If a precondition is orphaned, add a task that creates it.
 
@@ -137,6 +137,20 @@ Ask: "Am I designing this system to mirror what the output looks like, or to mir
 
 **How to catch it:** At least one task — ideally an integration milestone, not just the final task — must have acceptance criteria that reference the quality bar examples directly: "Compare output against [reference example]. Verify the output captures the same patterns, cross-entity relationships, and depth of insight." If no task's acceptance criteria mention the quality bar, the build loop is closed and the quality bar is outside it.
 
+**The pipeline-level variant:** The same pattern applies beyond individual tasks. The entire pipeline can be internally consistent — PRD, XRD, peer review, test plan, tasks, and tests all aligned — and the product can still be broken because the loop is closed against the spec, not against the user's experience. Nacre 0.5.1 demonstrated this: 1383 tests passing, every task complete, and the product didn't work for the user. The fix is the Smoke Test stage (Stage 10 in `orchestrator.md`), which runs the product against the PRD's First-Use Walkthrough after all code is complete. The walkthrough was written before code existed. If the running product can't complete it, the build loop was closed.
+
+## The Heroic Unblock
+
+**What it is:** The agent encounters a missing dependency or precondition that belongs to another task, and resolves it itself rather than reporting the block. It has enough context to see what's missing and enough capability to fill the gap — so it does. The result: work that belongs to Task 5 gets done inside Task 8, undocumented, untested against Task 5's acceptance criteria, and invisible to whoever picks up Task 5 later.
+
+**Why it happens:** The agent's training rewards problem-solving. When it sees a blocker and knows how to fix it, "stop and report" feels like giving up. The RL tuning is designed to pull in context and resolve, not to hand off. Broader context makes this worse — an agent that can see the full project sees more opportunities to be heroic.
+
+**The signature:** Files modified that aren't in the task's Files section, but the modifications "make sense" — they're prerequisites the task genuinely needed. The agent's explanation sounds reasonable: "I needed X to exist before I could build Y, so I created X." The problem is that X was another task's responsibility.
+
+**How to catch it:** Diff audit against the task's Files section (same as Scope Creep). The distinction: Scope Creep is the agent doing extra work it wasn't asked for. Heroic Unblock is the agent doing another task's work because it was blocked. Both are caught the same way — the diff shows files outside scope. The response differs: Scope Creep means "revert the extras." Heroic Unblock means "revert the extras and mark this task blocked."
+
+**How to prevent it:** Context scoping. The agent that can't see the dependency can't resolve it. The task's Context field limits what the agent reads. The `Depends on` field gates whether the task starts. Together, they remove the opportunity for heroism. See `prompts/peer-review-agent.md` (Orchestration) and `task-template.md` (Context field, dependency gate).
+
 ## The Clean Slate Bias
 
 **What it is:** The agent treats every task as greenfield even when 80% of the solution already exists in the codebase. Rather than finding and extending existing code, it writes new components from scratch — new utilities that duplicate existing ones, new abstractions that reimplement what's already there, new files in new directories when a one-line addition to an existing file would suffice.
@@ -157,4 +171,24 @@ Ask: "Am I designing this system to mirror what the output looks like, or to mir
 
 **The signature:** The app feels fast in development and slow in production. Database queries have no LIMIT clauses. API responses return full objects when the client needs two fields. Lists render every item instead of virtualizing. The codebase has no caching layer despite making the same expensive calls repeatedly.
 
-**How to catch it:** This is primarily a Product Maker responsibility. The PRD must include non-functional requirements — performance budgets, security posture, scale expectations — stated in human terms (see `product-maker.md`, "Non-Functional Requirements"). These give the SWE a mandate to build for longevity, not just correctness. The Peer Reviewer checks that the architecture addresses these requirements. Without non-functional requirements in the PRD, the agent has no reason to optimize and won't.
+**How to catch it:** This is primarily a Product Maker responsibility. The PRD must include non-functional requirements — performance budgets, security posture, scale expectations — stated in human terms (see `prompts/product-agent.md`, "Non-Functional Requirements"). These give the SWE a mandate to build for longevity, not just correctness. The Peer Reviewer checks that the architecture addresses these requirements. Without non-functional requirements in the PRD, the agent has no reason to optimize and won't.
+
+## Spec Without Shoes
+
+**What it is:** The PRD describes the system's capabilities but not the user's experience of discovering, configuring, and recovering from those capabilities. Every feature section is complete — what the system does, how the data model works, what the edge cases are. But nobody walked the product as a first-time user. There's no first-launch flow, no empty states, no configuration discovery path, no "what does the user see when they open this for the first time and nothing exists yet."
+
+**Why it happens:** The product-agent thinks in features and capabilities. The idea brief describes what the product should do, not what the user's first 15 minutes look like. The peer review checks documents against each other — PRD vs. XRD, contradictions, gaps between specs — but doesn't walk the product as a user would. The entire pipeline reviews the spec structurally but never experientially.
+
+**The signature:** The PRD has thorough feature sections but no first-use flow. There's no description of empty states. There's no configuration discovery — the user needs to know where to put files, what formats are supported, or how to set things up, but no document describes how they learn this. The product works if you already know how to use it. A person sitting down for the first time hits walls within minutes.
+
+**How to catch it:** The User-Experience Walkthrough gate. The product-agent writes a First-Use Walkthrough section as part of the PRD — a step-by-step walk through the user's first session. The peer reviewer independently walks the user journey before reading the PRD and compares. Gaps between the two walkthroughs are high-severity issues. See `prompts/product-agent.md` and `prompts/peer-review-agent.md`.
+
+## The Big Bang Integration
+
+**What it is:** The pipeline decomposes a large brief into tasks and tracks, builds them all in one pass, and smoke tests at the end. Integration bugs that exist from the first task compound across every subsequent task. The smoke test fails on multiple fronts because every piece was built on a broken foundation — a config misread, a wiring omission, a budget overflow — that existed before any task started.
+
+**Why it happens:** The pipeline treats briefs as single units. Task decomposition creates parallelism within a milestone but not sequencing between milestones. The SDM assesses once at the start and disappears. No one checks whether the output of an early task survives the constraints of the broader system until everything is built. The brief says "support five formats" and the pipeline builds all five before checking whether one format's output fits through the system's constraints.
+
+**The signature:** The smoke test fails on multiple steps simultaneously. The root cause is a single issue — a config bug, a wiring omission, a budget overflow — that existed before the first task started. Every task built on top of it. The fix is small but discovering it required building everything first. Four build cycles passed all tests. Four build cycles failed for the user.
+
+**How to catch it:** Decompose briefs into milestones. Each milestone produces working software the user can touch. Smoke test after each milestone. Run the SDM after each milestone's smoke test to reassess the codebase for the next milestone. Integration problems surface at the first milestone, not the last. See `orchestrator.md` Stage 0 (Milestone Decomposition) and Decision 27.

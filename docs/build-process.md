@@ -1,8 +1,24 @@
 # Build Process
 
+*The orchestrator's operational version of this pipeline is in `orchestrator.md`. If they diverge, `orchestrator.md` is authoritative.*
+
 The full pipeline from idea to shipped code. This document also covers how work moves between roles (handoff protocol) and how context persists across sessions (context management).
 
 ## The Pipeline
+
+### Stage 0: Milestone Decomposition
+
+Before the pipeline runs, the brief is decomposed into milestones. The product-agent reads the idea brief and proposes milestones — each one a unit of work that produces software the user can touch.
+
+Each milestone is independently valuable. "Support .docx files" is a milestone. "Support .docx, .xlsx, .pptx, resize images, and add ingestion transparency" is a brief containing five milestones. Each milestone gets its own pipeline pass: PRD, XRD, peer review, test plan, tasks, build, smoke test.
+
+Milestones are sequenced so integration-revealing work goes first. The milestone most likely to stress system-level constraints (context budget, wiring, performance) ships before feature-additive milestones. This means integration bugs surface at the first milestone, when the blast radius is smallest and the fix is cheapest.
+
+For simple briefs — a bug fix, a single feature, a configuration change — Stage 0 produces one milestone equal to the brief. Do not manufacture artificial decompositions for naturally atomic work.
+
+Input: idea brief.
+Output: milestone list with sequencing rationale.
+Handoff: human confirms. Stages 1-8 run per milestone.
 
 ### Stage 1: Idea Brief
 
@@ -16,17 +32,17 @@ Handoff: Product Maker reads the brief and writes the PRD.
 
 ### Stage 2: PRD
 
-The Product Maker writes a PRD following `product-maker.md`. The PRD makes decisions that matter to both the user and the developer. It includes a Decisions Log.
+The Product Maker writes a PRD following `prompts/product-agent.md`. The PRD makes decisions that matter to both the user and the developer. It includes a Decisions Log.
 
 Input: idea brief.
-Output: PRD with Decisions Log.
+Output: PRD with Decisions Log. For UI products, the PRD must include a First-Use Walkthrough section — a step-by-step walk through the user's first session from launch through first meaningful action, including empty states, configuration discovery, and failure paths. See `prompts/product-agent.md` for the full spec.
 Handoff: PRD is passed to the SWE for the XRD. The PRD document is the input — not a summary of it, not a conversation about it, the actual document.
 
 ### Stage 3: XRD
 
-The SWE writes an Engineering Response Document following `swe.md`. The XRD responds to the PRD with architecture, open questions, pushback, and a build plan broken into concurrent tracks.
+The SWE writes an Engineering Response Document following `prompts/swe-agent.md`. The XRD responds to the PRD with architecture, open questions, pushback, and a build plan broken into concurrent tracks.
 
-If the project has quality bar examples (smoke tests, reference outputs, sample deliverables), the XRD must include a **Quality Bar Trace**: one concrete example traced forward through the proposed architecture to verify the output stage receives sufficient data to reproduce it. See `swe.md` for the full protocol. If the trace reveals a cost-quality tradeoff (e.g., compressing raw data to reduce API costs at the expense of output depth), the tradeoff is stated explicitly and escalated to the Product Maker before task decomposition begins.
+If the project has quality bar examples (smoke tests, reference outputs, sample deliverables), the XRD must include a **Quality Bar Trace**: one concrete example traced forward through the proposed architecture to verify the output stage receives sufficient data to reproduce it. See `prompts/swe-agent.md` for the full protocol. If the trace reveals a cost-quality tradeoff (e.g., compressing raw data to reduce API costs at the expense of output depth), the tradeoff is stated explicitly and escalated to the Product Maker before task decomposition begins.
 
 Input: PRD (the document).
 Output: XRD with architecture, open questions, build plan.
@@ -34,7 +50,7 @@ Handoff: PRD + XRD are passed to the Peer Reviewer and the Tester simultaneously
 
 ### Stage 4: Peer Review
 
-The Peer Reviewer reads the PRD and XRD as a matched set, following `peer-reviewer.md`. The review surfaces contradictions, gaps, and judgment calls.
+The Peer Reviewer reads the PRD and XRD as a matched set, following `prompts/peer-review-agent.md`. The review surfaces contradictions, gaps, and judgment calls.
 
 Input: PRD + XRD (both documents).
 Output: Peer Review with issues table and recommendations.
@@ -42,7 +58,7 @@ Handoff: Product Maker resolves high-severity issues and updates the Decisions L
 
 ### Stage 5: Test Plan
 
-The Tester writes a test plan following `tester.md`. The PRD is the source of truth for product intent. The XRD is consulted for implementation-revealed edge cases — integration boundaries, architecture constraints, timing issues — but does not override PRD-driven coverage. Test cases sourced from the XRD rather than the PRD are tagged [XRD].
+The Tester writes a test plan following `prompts/tester-agent.md`. The PRD is the source of truth for product intent. The XRD is consulted for implementation-revealed edge cases — integration boundaries, architecture constraints, timing issues — but does not override PRD-driven coverage. Test cases sourced from the XRD rather than the PRD are tagged [XRD].
 
 Input: PRD (primary) + XRD (supplementary).
 Output: Test plan with automatable test cases.
@@ -53,7 +69,7 @@ Transition criteria: every PRD feature section has at least one corresponding te
 
 Before writing task files, the SWE produces a `DAY-ZERO.md` document in the project root. This document contains every shared interface, schema, and convention that cross-track tasks depend on — function signatures, JSON schemas, protocol definitions, enum shapes, naming conventions. Task files may not reference a contract that isn't in DAY-ZERO.md.
 
-After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done. At least one task — typically an integration milestone or the final output task — must include acceptance criteria that reference the quality bar examples directly. Not "does the pipeline run?" but "does the output match the reference examples in pattern depth, cross-entity relationships, and analytical quality?" If no task's acceptance criteria mention the quality bar, the build loop is closed and the quality bar is outside it (see `agent-failure-modes.md`, "The Closed-Loop Build").
+After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done. At least one task — typically an integration milestone or the final output task — must include acceptance criteria that reference the quality bar examples directly. Not "does the pipeline run?" but "does the output match the reference examples in pattern depth, cross-entity relationships, and analytical quality?" If no task's acceptance criteria mention the quality bar, the build loop is closed and the quality bar is outside it (see `docs/agent-failure-modes.md`, "The Closed-Loop Build").
 
 After task files are written, run a **user-story walkthrough**: start from an empty directory (or an empty machine, if the project has infrastructure prerequisites) and walk through every step a developer would take to reach the first task's acceptance criteria. Every precondition — installed tools, created directories, configuration files, scaffolding — must trace to either a prior task or explicit documentation. If a precondition is orphaned (no task creates it, no doc explains it), add a task.
 
@@ -79,6 +95,25 @@ When a task is complete, the agent reports not just "done" but what it learned. 
 Input: task file + project codebase + CLAUDE.md.
 Output: working, tested code + insight/implication note.
 Handoff: Product Maker reviews the increment. Decisions Log updated if anything changed. Insight/implications feed forward into upcoming task files.
+
+### Stage 8: Smoke Test
+
+After each milestone's tasks are complete and tests pass, the product is verified against that milestone's PRD First-Use Walkthrough. The walkthrough was written before code existed (Stage 2). Now the product exists. Each step in the walkthrough is executed against the running product to verify the user experience matches the specification.
+
+For UI products, the orchestrator runs the walkthrough using Playwright MCP — opening a real browser, navigating pages, clicking elements, typing inputs, reading responses, and taking screenshots as evidence. The human's role is to start the server and provide the URL. Everything else is automated.
+
+For steps that require evaluating model responses (e.g., "does the product demonstrate knowledge of the user's documents"), the agent captures the full response text and judges whether it demonstrates real knowledge or just echoes filenames. The agent is a model — it can evaluate quality, not just presence.
+
+The smoke test runs per milestone, not per brief. Each milestone produces working software. Each milestone's smoke test verifies that software works. The next milestone does not begin until the current milestone's smoke test passes.
+
+After each milestone's smoke test, the SDM reassesses the codebase — reading the smoke test results, completed task files, and codebase diff to produce an updated context document for the next milestone's SWE. This catches integration problems and architectural drift between milestones.
+
+This stage exists because of a structural gap discovered across four Nacre build cycles: every cycle passed all tests, every cycle failed when a user sat down with the product. Tests verify code against the spec. The smoke test verifies the product against the user. Both are required.
+
+Input: running product + PRD First-Use Walkthrough + Playwright MCP tools.
+Output: smoke test report with pass/fail per walkthrough step and screenshot evidence.
+Handoff: if all steps pass, the milestone is complete. SDM reassesses the codebase for the next milestone. If any step fails, it becomes a bug report and feeds back into Stage 7 as a fix task.
+Transition criteria: every walkthrough step can be completed in the running product. For non-UI products, bash commands replace Playwright — the protocol is the same, only the interaction mechanism differs.
 
 ## Working Against an Existing Codebase
 
@@ -130,7 +165,19 @@ Before beginning any significant build phase, run a Heresy inspection:
 3. Search all documents and source code for that terminology.
 4. Any hit that is not the DECISIONS.md kill entry itself is a ghost. Remove it.
 
-This inspection takes minutes and prevents the failure mode described in `agent-failure-modes.md` as "The Heresy."
+This inspection takes minutes and prevents the failure mode described in `docs/agent-failure-modes.md` as "The Heresy."
+
+## Rework Pattern
+
+When a completed task is found to be wrong — not incomplete, but producing incorrect behavior that passed its original tests — the rework follows a specific pattern. This is distinct from a bug fix on in-progress work. Rework applies when a task was marked `done`, its Completed section was written, and the error was discovered later.
+
+1. **The rework gets its own task file.** The original task's Completed section reflects what was built at the time and is not rewritten. The append-only principle applies — history is not revised.
+2. **The rework task references the original:** `Rework of: Task [N]` in the header, with a clear statement of what the original task got wrong.
+3. **The original task gets an annotation** in its Completed section: `[Rework — see Task [M]]`. This is the only modification to the original task file.
+4. **The rework task's acceptance criteria include both the corrected behavior AND a regression check** that the original task's other acceptance criteria still pass. The fix must not break what was already working.
+5. **The Completed section on the rework task captures the insight** about what the original task got wrong and why the original tests didn't catch it. This insight is high-value — it reveals a gap in either the test plan, the acceptance criteria, or the task decomposition that can be applied forward to prevent the same class of error.
+
+This pattern preserves traceability while keeping the task sequence honest about what happened when. A project's task history should read as a truthful record, not a revised narrative.
 
 ## Handoff Protocol
 
@@ -162,13 +209,13 @@ When a role encounters ambiguity, contradiction, or a needed decision, the first
 
 **SWE finds PRD ambiguity → asks Product first.** Frame it with options and product-level tradeoffs: "The PRD says 'fast' but doesn't define a number. Option A gets sub-200ms with a cache layer. Option B gets sub-500ms and is simpler. Can you give me a product reason to choose?" Only escalate to the human if Product can't resolve it.
 
-**Tester finds contradiction → routes to the claim owner first.** If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. See `tester.md` for the full routing protocol.
+**Tester finds contradiction → routes to the claim owner first.** If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. See `prompts/tester-agent.md` for the full routing protocol.
 
-**Product names a technology → SWE can override if the rationale isn't user-facing.** See `product-maker.md` for the technology-in-PRD rule. If the SWE overrides, they state the tradeoff in product terms so Product can evaluate.
+**Product names a technology → SWE can override if the rationale isn't user-facing.** See `prompts/product-agent.md` for the technology-in-PRD rule. If the SWE overrides, they state the tradeoff in product terms so Product can evaluate.
 
-**SWE makes an implementation choice → includes a tradeoff statement.** Every non-trivial choice covers user-facing consequence, maintenance burden, and refactoring risk. Product reads the tradeoffs and flags what feels material. See `swe.md` for the full protocol.
+**SWE makes an implementation choice → includes a tradeoff statement.** Every non-trivial choice covers user-facing consequence, maintenance burden, and refactoring risk. Product reads the tradeoffs and flags what feels material. See `prompts/swe-agent.md` for the full protocol.
 
-**Tester finds contradiction → routes to the claim owner first.** The Tester reads the PRD and XRD against behavioral expectations and is often the first to discover contradictions neither document sees on its own. If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. Contradictions that neither role can resolve escalate to the human with both positions stated. See `tester.md` for the full routing protocol.
+**Tester finds contradiction → routes to the claim owner first.** The Tester reads the PRD and XRD against behavioral expectations and is often the first to discover contradictions neither document sees on its own. If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. Contradictions that neither role can resolve escalate to the human with both positions stated. See `prompts/tester-agent.md` for the full routing protocol.
 
 ### Escalation Criteria
 
@@ -210,6 +257,24 @@ At the end of every work session, update the project CLAUDE.md with:
 
 This takes five minutes and saves thirty minutes of re-orientation in the next session.
 
+## Loop Discipline
+
+The build process operates at three timescales — inner loop (task execution, minutes), middle loop (cross-task coherence, hours to days), and outer loop (architectural fitness, weeks to months). See `docs/roadmap.md` for open design questions about how these loops may become distinct operating modes with separate context, process, and gates.
+
+The current operating principle, applicable now regardless of whether the full loop model is implemented:
+
+**When an agent encounters a problem that requires context outside its task's declared scope, it does not pull in additional files to resolve it.** Instead:
+
+1. State what was encountered
+2. State what context would be needed to resolve it
+3. Write an escalation note (to OPEN-ITEMS.md or as a structured output)
+4. Continue with what can be completed within scope
+5. Stop when further progress requires the missing context
+
+The escalation is routed by the Peer Reviewer (see `prompts/peer-review-agent.md`, Orchestration). The Peer Reviewer decides whether to provide the missing context, route the issue to Product, or escalate to the human.
+
+This is the "hand off instead of pull in" behavior. It fights the RL-trained instinct to pull more context and resolve. An agent that stops and writes an escalation is not giving up — it is respecting the boundary between loops and trusting that the right context will arrive through the right channel.
+
 ### Multi-Project Context
 
 When building multiple projects simultaneously, each project has its own CLAUDE.md and its own tasks directory. The master `~/building/` files are shared. Do not cross-pollinate project-specific decisions. If a pattern emerges that applies across projects, add it to the master files.
@@ -235,7 +300,7 @@ The code pipeline (PRD → XRD → Peer Review → Test Plan → Tasks → Build
 
 ### Stages
 
-**Stage 1: Draft.** Write the document following the relevant role definition. PRDs follow `product-maker.md`. XRDs follow `swe.md`. Essays and external documents follow the writer's own structure. The draft is the thinking — get the substance right before worrying about the surface.
+**Stage 1: Draft.** Write the document following the relevant role definition. PRDs follow `prompts/product-agent.md`. XRDs follow `prompts/swe-agent.md`. Essays and external documents follow the writer's own structure. The draft is the thinking — get the substance right before worrying about the surface.
 
 **Stage 2: Failure modes check.** Run the draft against `writing-failure-modes.md`. The trigger: if it will be read by someone other than you, run the checklist. Fortune cookie test, friend test, em dash count, triplet audit, hedge check, register scan. Fix what the checklist catches.
 
