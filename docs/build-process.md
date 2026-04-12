@@ -1,8 +1,8 @@
 # Build Process
 
-*The orchestrator's operational version of this pipeline is in `orchestrator.md`. If they diverge, `orchestrator.md` is authoritative.*
+*The orchestrator's operational version of this pipeline is in `orchestrator.md`. That file is what agents consume at runtime. This file is the human-readable reference — it includes additional context on handoff protocols, existing codebase guidance, the writing pipeline, and the rationale behind pipeline design choices that agents don't need but humans do. If the two files diverge, `orchestrator.md` is authoritative.*
 
-The full pipeline from idea to shipped code. This document also covers how work moves between roles (handoff protocol) and how context persists across sessions (context management).
+The full pipeline from idea to shipped, verified, stress-tested code. This document also covers how work moves between roles (handoff protocol), how context persists across sessions (context management), and design rationale for pipeline choices.
 
 ## The Pipeline
 
@@ -10,15 +10,17 @@ The full pipeline from idea to shipped code. This document also covers how work 
 
 Before the pipeline runs, the brief is decomposed into milestones. The product-agent reads the idea brief and proposes milestones — each one a unit of work that produces software the user can touch.
 
-Each milestone is independently valuable. "Support .docx files" is a milestone. "Support .docx, .xlsx, .pptx, resize images, and add ingestion transparency" is a brief containing five milestones. Each milestone gets its own pipeline pass: PRD, XRD, peer review, test plan, tasks, build, smoke test.
+Each milestone is independently valuable. "Support .docx files" is a milestone. "Support .docx, .xlsx, .pptx, resize images, and add ingestion transparency" is a brief containing five milestones. Each milestone gets its own pipeline pass: PRD, XRD, security review, peer review, test plan, tasks, build, security code review, smoke test.
 
 Milestones are sequenced so integration-revealing work goes first. The milestone most likely to stress system-level constraints (context budget, wiring, performance) ships before feature-additive milestones. This means integration bugs surface at the first milestone, when the blast radius is smallest and the fix is cheapest.
 
 For simple briefs — a bug fix, a single feature, a configuration change — Stage 0 produces one milestone equal to the brief. Do not manufacture artificial decompositions for naturally atomic work.
 
+**Milestone directories:** Every milestone gets its own directory named `m<number>-<project>-<goal>/` containing all milestone docs and a `tasks/` subdirectory. The directory name includes the project name and a short goal description so the folder structure is self-documenting. See `orchestrator.md` Stage 0 for the full directory structure spec.
+
 Input: idea brief.
-Output: milestone list with sequencing rationale.
-Handoff: human confirms. Stages 1-8 run per milestone.
+Output: milestone list with sequencing rationale + milestone directories created.
+Handoff: human confirms. Stages 1–10 run per milestone.
 
 ### Stage 1: Idea Brief
 
@@ -35,85 +37,135 @@ Handoff: Product Maker reads the brief and writes the PRD.
 The Product Maker writes a PRD following `prompts/product-agent.md`. The PRD makes decisions that matter to both the user and the developer. It includes a Decisions Log.
 
 Input: idea brief.
-Output: PRD with Decisions Log. For UI products, the PRD must include a First-Use Walkthrough section — a step-by-step walk through the user's first session from launch through first meaningful action, including empty states, configuration discovery, and failure paths. See `prompts/product-agent.md` for the full spec.
+Output: PRD with Decisions Log, written to the milestone directory. For UI products, the PRD must include a First-Use Walkthrough section — a step-by-step walk through the user's first session from launch through first meaningful action, including empty states, configuration discovery, and failure paths. See `prompts/product-agent.md` for the full spec.
 Handoff: PRD is passed to the SWE for the XRD. The PRD document is the input — not a summary of it, not a conversation about it, the actual document.
 
-### Stage 3: XRD
+### Stage 3: XRD + Security Review
 
 The SWE writes an Engineering Response Document following `prompts/swe-agent.md`. The XRD responds to the PRD with architecture, open questions, pushback, and a build plan broken into concurrent tracks.
+
+In parallel, the security agent reviews the PRD and XRD for architectural security gaps — threat surface, auth/authz design, trust boundary gaps, secrets management, and dependency risk. Critical and High security findings are gate blockers resolved before advancing.
 
 If the project has quality bar examples (smoke tests, reference outputs, sample deliverables), the XRD must include a **Quality Bar Trace**: one concrete example traced forward through the proposed architecture to verify the output stage receives sufficient data to reproduce it. See `prompts/swe-agent.md` for the full protocol. If the trace reveals a cost-quality tradeoff (e.g., compressing raw data to reduce API costs at the expense of output depth), the tradeoff is stated explicitly and escalated to the Product Maker before task decomposition begins.
 
 Input: PRD (the document).
-Output: XRD with architecture, open questions, build plan.
-Handoff: PRD + XRD are passed to the Peer Reviewer and the Tester simultaneously.
+Output: XRD with architecture, open questions, build plan; Security assessment. Both written to the milestone directory.
+Handoff: PRD + XRD are passed to the Peer Reviewer and the Tester simultaneously. Security findings feed into the pushback loop.
 
-### Stage 4: Peer Review
+### Stage 4: Pushback Resolution
+
+The orchestrator takes each XRD pushback item (and any security findings requiring product judgment) and routes it to the product-agent with the relevant PRD section. The product-agent responds with a decision framed as insight/implication. Items it cannot resolve are Tier 3 — surfaced to the human.
+
+Input: PRD, XRD pushback items, security findings.
+Output: Updated PRD Decisions Log, updated XRD.
+Handoff: Resolved documents advance to peer review.
+
+### Stage 5: Peer Review
 
 The Peer Reviewer reads the PRD and XRD as a matched set, following `prompts/peer-review-agent.md`. The review surfaces contradictions, gaps, and judgment calls.
 
 Input: PRD + XRD (both documents).
-Output: Peer Review with issues table and recommendations.
+Output: Peer Review with issues table and recommendations, written to the milestone directory.
 Handoff: Product Maker resolves high-severity issues and updates the Decisions Log. SWE updates the XRD if architecture changes.
 
-### Stage 5: Test Plan
+### Stage 6: Test Plan
 
 The Tester writes a test plan following `prompts/tester-agent.md`. The PRD is the source of truth for product intent. The XRD is consulted for implementation-revealed edge cases — integration boundaries, architecture constraints, timing issues — but does not override PRD-driven coverage. Test cases sourced from the XRD rather than the PRD are tagged [XRD].
 
+The test plan includes a **stress test section** that translates the PRD's non-functional requirements into testable stress scenarios with load parameters and measurable pass/fail thresholds. This section feeds Stage 11 (Stress Test).
+
 Input: PRD (primary) + XRD (supplementary).
-Output: Test plan with automatable test cases.
+Output: Test plan with functional test cases and stress test specifications, written to the milestone directory.
 Handoff: Test plan becomes an input to task decomposition. Tests are the acceptance criteria.
-Transition criteria: every PRD feature section has at least one corresponding test case.
+Transition criteria: every PRD feature section has at least one corresponding test case; stress test section present with thresholds.
 
-### Stage 6: Task Decomposition
+### Stage 7: SDM Review
 
-Before writing task files, the SWE produces a `DAY-ZERO.md` document in the project root. This document contains every shared interface, schema, and convention that cross-track tasks depend on — function signatures, JSON schemas, protocol definitions, enum shapes, naming conventions. Task files may not reference a contract that isn't in DAY-ZERO.md.
+For existing codebases only. The SDM assesses what exists and produces a codebase context document so the SWE doesn't propose a rewrite when a modification would do.
 
-After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done. At least one task — typically an integration milestone or the final output task — must include acceptance criteria that reference the quality bar examples directly. Not "does the pipeline run?" but "does the output match the reference examples in pattern depth, cross-entity relationships, and analytical quality?" If no task's acceptance criteria mention the quality bar, the build loop is closed and the quality bar is outside it (see `docs/agent-failure-modes.md`, "The Closed-Loop Build").
+The SDM also runs a **refactoring assessment** at this point and at every subsequent trigger (mid-build synthesis, post-milestone reassessment). If the SDM determines that continuing the milestone would create maintenance complexity or cascading bug risk that exceeds the value of new features, it halts the milestone. This is a Tier 3 decision surfaced to the human. See `prompts/sdm-agent.md` for the full refactoring assessment protocol.
 
-After task files are written, run a **user-story walkthrough**: start from an empty directory (or an empty machine, if the project has infrastructure prerequisites) and walk through every step a developer would take to reach the first task's acceptance criteria. Every precondition — installed tools, created directories, configuration files, scaffolding — must trace to either a prior task or explicit documentation. If a precondition is orphaned (no task creates it, no doc explains it), add a task.
+Input: PRD, XRD, existing codebase.
+Output: Codebase context document.
+Handoff: SWE receives context document alongside test plan and peer review for task decomposition.
 
-> **Insight:** Task decomposition from the engineering perspective starts from the architecture and works down. It misses preconditions that are only visible when walking the user story from zero — project scaffolds, tool installation, configuration that "everyone knows" but no task creates.
-> **Implication:** A single walkthrough from empty directory to first working test catches an entire class of gaps that no amount of architectural review surfaces.
-> **Decision:** User-story walkthrough is a required verification step after task decomposition, before any build work begins.
+### Stage 8: Task Decomposition
 
-For existing codebases, task decomposition must also consider **deployment boundaries**. Each task should be independently deployable — shippable as its own PR without requiring other tasks to land simultaneously — or explicitly grouped with other tasks into a deployment unit. A task that can only ship bundled with three other tasks is a risk signal: it means testing and rollback are coupled across a larger surface. When a task can't be independently deployed, the task file states which other tasks it must ship with and why.
+Before writing task files, the SWE produces a `DAY-ZERO.md` document in the milestone directory. This document contains every shared interface, schema, and convention that cross-track tasks depend on — function signatures, JSON schemas, protocol definitions, enum shapes, naming conventions. Task files may not reference a contract that isn't in DAY-ZERO.md.
 
-**Scaling signal:** If task decomposition produces more than ~30 tasks, or if writing task files requires making architectural decisions the XRD didn't anticipate, the project may have outgrown a single XRD. The sign is that task decomposition feels like architecture work — you're deciding how subsystems interact, not just breaking known work into units. When this happens, stop decomposing. The XRD needs to be split into subsystem specs first, each with its own task set, its own DAY-ZERO contracts, and explicit contracts between subsystems. The current framework then operates per-subsystem. This is not a failure — it's the project telling you its actual shape.
+After DAY-ZERO.md is reviewed, the SWE decomposes each phase into agent-executable task files following `task-template.md`. Each task has a clear scope, input, output, acceptance criteria, and test that proves done. At least one task — typically an integration milestone or the final output task — must include acceptance criteria that reference the quality bar examples directly.
 
-Input: XRD build plan + test plan + peer review resolutions.
-Output: `DAY-ZERO.md` + task files in `tasks/` directory.
+After task files are written, run a **user-story walkthrough**: start from an empty directory and walk through every step a developer would take to reach the first task's acceptance criteria. Every precondition — installed tools, created directories, configuration files, scaffolding — must trace to either a prior task or explicit documentation. If a precondition is orphaned, add a task.
+
+Before advancing to Stage 9, the orchestrator runs a **controversy review**: the product-agent identifies the 5 decisions most likely to produce a user experience gap. The human resolves each item. This is a gate.
+
+For existing codebases, task decomposition must also consider **deployment boundaries**. Each task should be independently deployable or explicitly grouped with other tasks into a deployment unit with justification.
+
+**Scaling signal:** If decomposition produces >30 tasks, the XRD needs to be split into subsystem specs first.
+
+Input: XRD build plan + test plan + peer review resolutions + SDM context (if exists).
+Output: DAY-ZERO.md + task files in the milestone's `tasks/` directory.
 Handoff: Tasks are ready for agents to execute.
-Transition criteria: every task file references only contracts defined in DAY-ZERO.md, every acceptance criterion maps to a test in the test plan, and the user-story walkthrough passes with no orphaned preconditions.
+Transition criteria: every task references only DAY-ZERO contracts, every acceptance criterion maps to a test, user-story walkthrough passes, controversy review complete.
 
-### Stage 7: Build
+### Stage 9: Build
 
 Agents execute tasks. One at a time (sequential) or multiple in parallel (concurrent). Each task is self-contained. The agent reads the task file, the CLAUDE.md, and the project context. It builds, tests, and reports done.
 
-When a task is complete, the agent reports not just "done" but what it learned. Every completed task includes an insight/implication note: what building this revealed that wasn't in the spec, and what that means for upcoming tasks or for the project as a whole. This is how the build process generates intelligence, not just code.
+When a task is complete, the agent reports not just "done" but what it learned. Every completed task includes an insight/implication note: what building this revealed that wasn't in the spec, and what that means for upcoming tasks or for the project as a whole.
+
+During the build, the SDM monitors for **accumulating fragility** — maintenance complexity or cascading bug risk that grows across tasks. When thresholds are met, the SDM halts the milestone. See `prompts/sdm-agent.md`.
 
 Input: task file + project codebase + CLAUDE.md.
 Output: working, tested code + insight/implication note.
-Handoff: Product Maker reviews the increment. Decisions Log updated if anything changed. Insight/implications feed forward into upcoming task files.
+Handoff: Decisions consolidated to milestone DECISIONS.md at wave boundaries. Insight/implications feed forward into upcoming task files.
 
-### Stage 8: Smoke Test
+### Stage 9.5: Security Code Review
 
-After each milestone's tasks are complete and tests pass, the product is verified against that milestone's PRD First-Use Walkthrough. The walkthrough was written before code existed (Stage 2). Now the product exists. Each step in the walkthrough is executed against the running product to verify the user experience matches the specification.
+After all tasks pass their gates, the security agent reviews the source code for implementation vulnerabilities — injection surfaces, auth enforcement gaps, secrets in code, insecure defaults, and common vulnerability patterns.
 
-For UI products, the orchestrator runs the walkthrough using Playwright MCP — opening a real browser, navigating pages, clicking elements, typing inputs, reading responses, and taking screenshots as evidence. The human's role is to start the server and provide the URL. Everything else is automated.
+Critical and High findings block the smoke test. Each becomes a fix task run through Stage 9.
 
-For steps that require evaluating model responses (e.g., "does the product demonstrate knowledge of the user's documents"), the agent captures the full response text and judges whether it demonstrates real knowledge or just echoes filenames. The agent is a model — it can evaluate quality, not just presence.
+Input: source code, XRD, dependency manifests.
+Output: Code security review document, written to the milestone directory.
+Handoff: Fix tasks if needed, then advance to smoke test.
+
+### Stage 10: Smoke Test
+
+After each milestone's tasks are complete, tests pass, and security code review clears, the product is verified against that milestone's PRD First-Use Walkthrough. The walkthrough was written before code existed (Stage 2). Now the product exists. Each step in the walkthrough is executed against the running product to verify the user experience matches the specification.
+
+For UI products, the orchestrator runs the walkthrough using Playwright MCP — opening a real browser, navigating pages, clicking elements, typing inputs, reading responses, and taking screenshots as evidence. The human's role is to start the server and provide the URL. Everything else is automated. See `prompts/smoke-test-protocol.md` for the full protocol.
+
+For steps that require evaluating model responses, the agent captures the full response text and judges whether it demonstrates real knowledge or just echoes filenames.
 
 The smoke test runs per milestone, not per brief. Each milestone produces working software. Each milestone's smoke test verifies that software works. The next milestone does not begin until the current milestone's smoke test passes.
 
-After each milestone's smoke test, the SDM reassesses the codebase — reading the smoke test results, completed task files, and codebase diff to produce an updated context document for the next milestone's SWE. This catches integration problems and architectural drift between milestones.
+After each milestone's smoke test, the SDM reassesses the codebase — reading the smoke test results, completed task files, and codebase diff to produce an updated context document for the next milestone's SWE.
 
-This stage exists because of a structural gap discovered across four Nacre build cycles: every cycle passed all tests, every cycle failed when a user sat down with the product. Tests verify code against the spec. The smoke test verifies the product against the user. Both are required.
+Input: running product + PRD First-Use Walkthrough + Playwright MCP tools (or bash for non-UI products).
+Output: smoke test report with pass/fail per walkthrough step and screenshot evidence, written to the milestone directory.
+Handoff: if all steps pass, the milestone is complete. If any step fails, it becomes a fix task feeding back into Stage 9.
 
-Input: running product + PRD First-Use Walkthrough + Playwright MCP tools.
-Output: smoke test report with pass/fail per walkthrough step and screenshot evidence.
-Handoff: if all steps pass, the milestone is complete. SDM reassesses the codebase for the next milestone. If any step fails, it becomes a bug report and feeds back into Stage 7 as a fix task.
-Transition criteria: every walkthrough step can be completed in the running product. For non-UI products, bash commands replace Playwright — the protocol is the same, only the interaction mechanism differs.
+### Stage 11: Stress Test
+
+After the **final milestone's** smoke test passes, the stress test verifies the product holds up under sustained use and adverse conditions. This stage runs once per project, not per milestone.
+
+The stress test covers four categories: memory/resource leaks, concurrent operations, error recovery/timeouts, and boundary conditions at scale. The test plan (Stage 6) specifies load parameters and pass/fail thresholds for each category. See `prompts/stress-test-protocol.md` for the full protocol.
+
+**Design rationale — why once per project, not per milestone:** Running stress tests per-milestone would be expensive and many resilience issues only manifest at full-system scale — a memory leak from milestone 1's parser may only become visible when milestone 3's features exercise the parser under sustained load. The smoke test catches functional issues per-milestone. The stress test catches resilience issues at full-system scope. This means resilience problems baked into early milestones aren't caught until the final stress test. That's the tradeoff: earlier detection vs. the cost of running stress tests after every milestone and the reality that many stress failures only appear when all components are integrated. If a project has high resilience risk (real-time systems, long-running services, high-concurrency products), consider running abbreviated stress tests per-milestone — this is a Tier 2 decision logged in the project's DECISIONS.md.
+
+Input: running product + test plan stress test section.
+Output: stress test report with pass/fail per category.
+Handoff: if all categories pass, the project is complete. If any fail, each failure becomes a fix task through Stage 9, then Stage 11 reruns — all categories, not just the failures.
+
+### Post-Project: Cost Assessment
+
+After Stage 11 passes, optionally run the cost agent. The cost agent reads the shipped codebase and infrastructure configuration to surface opportunities to reduce operational costs without degrading user experience. It does not gate any stage. Its output is a recommendations document for the human. See `prompts/cost-agent.md`.
+
+The cost agent may also be invoked ad hoc at any time for any running system.
+
+Input: source code, infrastructure config, dependency manifests, PRD, XRD, DECISIONS.md.
+Output: cost assessment document with ranked recommendations.
 
 ## Working Against an Existing Codebase
 
@@ -185,7 +237,7 @@ Every handoff between stages follows two rules:
 
 **Pass the document, not a summary.** When the SWE writes an XRD, they read the PRD document. Not a verbal summary. Not highlights from a conversation. The document. This is because the document contains decisions and specifics that conversations lose. It also means the receiving role can audit their own understanding against the source.
 
-**The output of each stage lives in a file.** PRD is a file. XRD is a file. Peer Review is a file. Test Plan is a file. Tasks are files. Decisions Log is a file. Nothing critical exists only in a conversation. Conversations are how you think. Files are how you build.
+**The output of each stage lives in a file.** PRD is a file. XRD is a file. Peer Review is a file. Test Plan is a file. Tasks are files. Decisions Log is a file. Nothing critical exists only in a conversation. Conversations are how you think. Files are how you build. All milestone documents are written to the milestone directory.
 
 **Stage transitions are explicit.** When a stage is complete, the person (or agent) who completed it states: "Stage N is done. The output is [filename]. The next stage is [N+1]. The input for that stage is [list of files]." This prevents drift.
 
@@ -209,13 +261,13 @@ When a role encounters ambiguity, contradiction, or a needed decision, the first
 
 **SWE finds PRD ambiguity → asks Product first.** Frame it with options and product-level tradeoffs: "The PRD says 'fast' but doesn't define a number. Option A gets sub-200ms with a cache layer. Option B gets sub-500ms and is simpler. Can you give me a product reason to choose?" Only escalate to the human if Product can't resolve it.
 
-**Tester finds contradiction → routes to the claim owner first.** If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. See `prompts/tester-agent.md` for the full routing protocol.
+**Tester finds contradiction → routes to the claim owner first.** If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. Contradictions that neither role can resolve escalate to the human with both positions stated. See `prompts/tester-agent.md` for the full routing protocol.
 
 **Product names a technology → SWE can override if the rationale isn't user-facing.** See `prompts/product-agent.md` for the technology-in-PRD rule. If the SWE overrides, they state the tradeoff in product terms so Product can evaluate.
 
 **SWE makes an implementation choice → includes a tradeoff statement.** Every non-trivial choice covers user-facing consequence, maintenance burden, and refactoring risk. Product reads the tradeoffs and flags what feels material. See `prompts/swe-agent.md` for the full protocol.
 
-**Tester finds contradiction → routes to the claim owner first.** The Tester reads the PRD and XRD against behavioral expectations and is often the first to discover contradictions neither document sees on its own. If the PRD says "works offline" and the XRD says "requires network," the Tester asks Product to clarify intent. If the XRD's migration strategy has a gap, the Tester asks SWE to resolve. The other role is cc'd but the owner responds first. Contradictions that neither role can resolve escalate to the human with both positions stated. See `prompts/tester-agent.md` for the full routing protocol.
+**Security agent flags a finding → routed by severity.** Critical and High findings are gate blockers routed to the SWE for remediation. Findings that require product judgment (e.g., what auth model to use, what data to encrypt) are routed through the pushback loop to the product-agent.
 
 ### Escalation Criteria
 
@@ -225,6 +277,7 @@ A decision surfaces to the human when:
 - **Refactoring risk is non-trivial.** The choice creates a foundation that's expensive to undo if the product direction changes.
 - **The tradeoff crosses project boundaries.** Only the human sees the full roadmap across projects.
 - **Neither role can resolve the contradiction.** It requires a judgment call about product direction, resource allocation, or strategic priority.
+- **The SDM halts a milestone.** The refactoring assessment determined continuing would create structural unsoundness. The human decides whether to pause and refactor, continue, or restructure scope.
 
 These are judgment calls, not formulas. The bias is always to surface rather than suppress.
 
@@ -238,13 +291,15 @@ Every AI session starts with a blank context. The agent doesn't remember yesterd
 
 Everything that matters lives in a file. The CLAUDE.md is the index. Project-specific context layers on top.
 
-**Master context** (`~/building/CLAUDE.md`): Building philosophy, role definitions, process, quality bar. Symlinked or referenced from every project.
+**Master context** (`~/building/CLAUDE.md`): Building philosophy, role definitions, process, quality bar. Referenced from every project.
 
 **Project context** (project-root `CLAUDE.md`): Project-specific decisions, architecture summary, current status, what's been built, what's next. This file is updated after every work session.
 
-**Decisions Log** (`DECISIONS.md`): Every resolved question with rationale and date. Agents read this before making architectural choices.
+**Milestone directories** (`m<number>-<project>-<goal>/`): Each milestone's complete documentation — PRD, XRD, peer review, test plan, security reviews, smoke test report, decisions, open items, and task files. The directory name tells you what was built.
 
-**Task files** (`tasks/`): The current state of the build. Which tasks are done, which are in progress, which are next.
+**Decisions Log** (`DECISIONS.md`): Project-level consolidated record of every resolved question with rationale and date. Milestone-level DECISIONS.md files contain decisions made during that milestone; the project-level file is assembled from them.
+
+**Task files** (milestone `tasks/` directory): The current state of the build. Which tasks are done, which are in progress, which are next.
 
 ### Updating Context After Each Session
 
@@ -271,13 +326,13 @@ The current operating principle, applicable now regardless of whether the full l
 4. Continue with what can be completed within scope
 5. Stop when further progress requires the missing context
 
-The escalation is routed by the Peer Reviewer (see `prompts/peer-review-agent.md`, Orchestration). The Peer Reviewer decides whether to provide the missing context, route the issue to Product, or escalate to the human.
+The escalation is routed by the orchestrator. The orchestrator decides whether to provide the missing context, route the issue to another agent, or escalate to the human.
 
 This is the "hand off instead of pull in" behavior. It fights the RL-trained instinct to pull more context and resolve. An agent that stops and writes an escalation is not giving up — it is respecting the boundary between loops and trusting that the right context will arrive through the right channel.
 
 ### Multi-Project Context
 
-When building multiple projects simultaneously, each project has its own CLAUDE.md and its own tasks directory. The master `~/building/` files are shared. Do not cross-pollinate project-specific decisions. If a pattern emerges that applies across projects, add it to the master files.
+When building multiple projects simultaneously, each project has its own CLAUDE.md, its own milestone directories, and its own task files. The master `~/building/` files are shared. Do not cross-pollinate project-specific decisions. If a pattern emerges that applies across projects, add it to the master files.
 
 ### The Symlink Pattern
 

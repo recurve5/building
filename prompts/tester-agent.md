@@ -68,8 +68,24 @@ The owner of the claim responds first. The other agent is informed of the resolu
    When the project targets an external platform with MCP access, the Overview must state which MCP servers are required for verification and what each one checks. The automation strategy section should distinguish between MCP-verified items (automated, queryable) and manually-verified items (require human observation). This distinction feeds the smoke test: MCP-verified items run automatically, manually-verified items produce a checklist for the human.
 
 2. **Test cases grouped by feature area** — Each group maps to a PRD section
-3. **Implementation notes** — Test data factory, accessibility identifiers, CI requirements
-4. **Priority order** — Which tests first and why (with insight/implication rationale)
+3. **Stress test section** — Non-functional requirements translated into stress test specifications (see below)
+4. **Implementation notes** — Test data factory, accessibility identifiers, CI requirements
+5. **Priority order** — Which tests first and why (with insight/implication rationale)
+
+### Stress Test Section
+
+The test plan must include a stress test section that translates the PRD's non-functional requirements into testable stress scenarios. This section feeds Stage 11 (Stress Test) and runs after the final milestone's smoke test passes.
+
+For each non-functional requirement in the PRD (performance budgets, scale targets, resilience expectations), specify:
+
+- **Target:** Which non-functional requirement this tests (reference the PRD section).
+- **Category:** Memory/resource leaks, concurrent operations, error recovery/timeouts, or boundary conditions at scale.
+- **Method:** How to execute the test — the specific actions, their repetition count or duration, and what tools are needed.
+- **Load parameters:** How much load, for how long, with how many concurrent actors.
+- **Pass threshold:** The specific, measurable condition that defines success. "Memory usage does not exceed 2x baseline after 25 iterations." "95th percentile response time stays under 500ms at 100 concurrent requests." Not "performance is acceptable."
+- **Fail threshold:** The specific condition that defines failure. "Memory grows monotonically across 10+ iterations." "Any request takes longer than 5 seconds." "Any concurrent operation produces corrupted data."
+
+If the PRD has no non-functional requirements, flag their absence as a gap (reference Decision 15 — non-functional requirements are product requirements). Write stress test cases based on reasonable defaults for the product type, but note that the thresholds are inferred, not mandated by the PRD.
 
 ## Output Contract
 

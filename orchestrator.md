@@ -15,14 +15,16 @@ Each stage has an agent, inputs, outputs, and a gate. You advance to the next st
 | 0. Milestone Decomposition | product-agent | Idea brief | Milestone list with sequencing rationale | Each milestone is independently valuable to the user. Milestones are sequenced so integration-revealing work goes first. Human confirms the decomposition. |
 | 1. Idea Brief | — | Human provides | Idea brief (text or file) | Brief exists and has enough substance for product-agent to work from |
 | 2. PRD | product-agent | Idea brief (scoped to current milestone) | PRD file with Decisions Log | All required PRD sections present (10 for UI products, 8 for non-UI). For UI products: First-Use Walkthrough section present. Decisions Log exists. No unresolved Tier 3 items. |
-| 3. XRD | swe-agent | PRD | XRD file with architecture, pushback, build plan | Architecture section present. Quality Bar Trace present (if quality bar examples exist). Pushback section present. Build plan with tracks and phases. |
+| 3. XRD + Security Review | swe-agent, security-agent | PRD | XRD file with architecture, pushback, build plan; Security assessment | Architecture section present. Quality Bar Trace present (if quality bar examples exist). Pushback section present. Build plan with tracks and phases. No Critical or High security findings unresolved. |
 | 4. Pushback Resolution | product-agent + swe-agent | PRD, XRD pushback items | Updated PRD Decisions Log, updated XRD | Every pushback item has a resolution. No unresolved Tier 3 items. |
 | 5. Peer Review | peer-review-agent | PRD, XRD | Review document with issues table | All high-severity issues resolved before proceeding. For UI products: User-Experience Gaps section present in review (peer reviewer independently walked the user journey). |
-| 6. Test Plan | tester-agent | PRD (primary), XRD (supplementary) | Test plan file | Every PRD feature section has at least one test case. |
+| 6. Test Plan | tester-agent | PRD (primary), XRD (supplementary) | Test plan file with stress test section | Every PRD feature section has at least one test case. Stress test section present with load parameters and pass/fail thresholds. |
 | 7. SDM Review | sdm-agent | PRD, XRD, existing codebase (if applicable) | Codebase context document | Only for existing codebases. SDM confirms XRD fits existing architecture or flags structural conflicts. |
 | 8. Task Decomposition | swe-agent | XRD, test plan, peer review resolutions, SDM context (if exists) | DAY-ZERO.md + task files | Every task references only DAY-ZERO contracts. Every acceptance criterion maps to a test. User-story walkthrough passes. Controversy review complete: product-agent has identified and the human has resolved the top 5 decisions most likely to produce a user experience gap. |
 | 9. Build | task-agent (per task) | Task file + scoped context | Tested code + Completed section | Acceptance criteria pass. No files modified outside scope. Completed section with insight/implication present. |
+| 9.5. Security Code Review | security-agent | Source code, XRD, dependency manifests | Code security review with findings | No Critical or High security findings. Medium findings logged with remediation. |
 | 10. Smoke Test | orchestrator | Running product + PRD First-Use Walkthrough | Smoke test report with pass/fail per walkthrough step | Every walkthrough step passes against the running product. |
+| 11. Stress Test | orchestrator | Running product + test plan stress test section | Stress test report with pass/fail per category | All stress test categories pass. Runs once after the final milestone's smoke test, not per milestone. |
 
 ## Pipeline Continuity
 
@@ -45,6 +47,58 @@ Rules for milestones:
 The product-agent returns a milestone list with: milestone name, what the user can do when it ships, sequencing rationale (why this one before that one), and integration risk (what this milestone will reveal about the system). Route the list to the human for confirmation before proceeding.
 
 After the human confirms, Stages 1-10 run for each milestone in order. Each milestone's PRD is scoped to that milestone — not the full brief.
+
+### Milestone Directory Structure
+
+Every milestone gets its own directory. The directory name includes the project name and a short goal description so the folder structure is self-documenting — someone browsing the project months later can see what happened when without opening any files.
+
+**Naming convention:** `m<number>-<project>-<goal>/`
+
+- `<number>` — Sequential milestone number (1, 2, 3...).
+- `<project>` — The project name, lowercase with hyphens. Consistent across all milestones in the same project.
+- `<goal>` — A short (2-5 word) description of what the milestone delivers, lowercase with hyphens.
+
+**Examples:**
+```
+m1-nacre-docx-ingestion/
+m2-nacre-xlsx-support/
+m3-nacre-ingestion-transparency/
+
+m1-habitai-core-tracking/
+m2-habitai-streaks-scoring/
+m3-habitai-weekly-review/
+```
+
+**What goes in the milestone directory:**
+```
+m1-nacre-docx-ingestion/
+  PRD.md                    # This milestone's PRD
+  XRD.md                    # This milestone's XRD
+  peer-review.md            # Peer review document
+  test-plan.md              # Test plan including stress test section
+  security-review.md        # Post-XRD security assessment
+  security-code-review.md   # Post-build security code review
+  smoke-test-report.md      # Smoke test results
+  DAY-ZERO.md               # Day Zero contracts for this milestone
+  DECISIONS.md              # Decisions made during this milestone
+  OPEN-ITEMS.md             # Open Tier 3 items for this milestone
+  tasks/                    # Task files for this milestone
+    001-setup-parser.md
+    002-extraction-service.md
+    ...
+```
+
+**What stays at the project root:**
+- `CLAUDE.md` — Project-level status, pipeline state, cumulative context.
+- `DECISIONS.md` — Project-level decisions log (consolidated from milestone decisions after each milestone completes). Milestone-level `DECISIONS.md` files contain decisions made during that milestone; the project-level file is the consolidated, authoritative record.
+- `OPEN-ITEMS.md` — Project-level open items.
+- Source code directories (`src/`, `lib/`, etc.) — code lives where the codebase puts it, not in milestone directories.
+
+**For simple briefs (single milestone):** The directory is still created. The naming convention still applies. A single-milestone project produces one directory like `m1-nacre-bug-fix-parser/`. This maintains consistency — every project's history is readable from its folder structure, whether it had one milestone or ten.
+
+**After a milestone completes:** The milestone directory is a permanent record. Do not move, rename, or archive it. The folder structure is the project's build history. When the SDM runs post-milestone reassessment, it reads the completed milestone's directory for context.
+
+The orchestrator creates the milestone directory at the start of each milestone (before Stage 1). All agents writing output for that milestone write to the milestone directory, not the project root.
 
 ## Spinning Up Agents
 
@@ -91,6 +145,17 @@ Do not give an agent files it doesn't need. Context isolation prevents failure m
 - For post-milestone reassessment: smoke test results, completed task files from the milestone, codebase diff
 - Never: test plan, peer review (unless mid-build synthesis requires it)
 
+**security-agent receives (Post-XRD):**
+- PRD (for understanding what data the product handles)
+- XRD (for architecture, data flow, technology choices, dependencies)
+- Never: source code, task files, test plans
+
+**security-agent receives (Post-Build):**
+- Source code (full codebase relevant to this milestone)
+- XRD (for intended architecture)
+- Dependency manifests (package.json, requirements.txt, Cargo.toml, etc.)
+- Never: task files, conversations, test results
+
 **task-agent receives (per task):**
 - The single task file
 - DAY-ZERO.md
@@ -132,6 +197,16 @@ Route the list to the human. The human resolves each item: accept, modify, or ch
 
 This review typically surfaces 3-5 scope changes and catches issues that structural review (peer review) and technical review (XRD pushback) miss — specifically, features that work correctly but produce invisible degradation, hard limits without overrides, and friction that scales with engagement.
 
+### Security Reviews (Stage 3 and Stage 9.5)
+
+Security review runs at two points in the pipeline.
+
+**Post-XRD (parallel with Stage 3 output review):** After the swe-agent returns the XRD, spin up security-agent with the PRD and XRD. The security agent assesses the proposed architecture for threat surface, auth/authz design, trust boundary gaps, secrets management, and dependency risk. Critical and High findings are gate blockers — resolve them before advancing to Stage 4 (Pushback Resolution). Security findings that involve product decisions (e.g., what data to encrypt, what auth model to use) are routed through the pushback loop alongside SWE pushback items.
+
+**Post-Build (Stage 9.5):** After all tasks in a milestone pass their gates and before the smoke test, spin up security-agent with the source code, XRD, and dependency manifests. The security agent reviews the implementation for injection surfaces, auth enforcement, secrets in code, insecure defaults, and vulnerability patterns. Critical and High findings block the smoke test — each becomes a fix task that runs through Stage 9 before proceeding. Medium findings are logged with remediation guidance and become tasks in the current or next milestone.
+
+Read `prompts/security-agent.md` for the full security review protocol.
+
 ### The Smoke Test (Stage 10)
 
 After each milestone's Stage 9 (Build) completes and all tasks pass their gates, run the product against that milestone's PRD First-Use Walkthrough using Playwright MCP. Tests verify code against the spec. The smoke test verifies the product against the user. The smoke test runs per milestone, not per brief — each milestone's working software is verified before the next milestone begins.
@@ -159,6 +234,36 @@ Read `prompts/smoke-test-protocol.md` for the full smoke test protocol.
 - All steps PASS: milestone complete. Advance to the next milestone or complete the pipeline.
 - Any step FAIL: each failed step becomes a fix task (following the task template). Run fix tasks through Stage 9, then rerun Stage 10. The milestone is not complete until all steps pass.
 - Any step BLOCKED: report what's blocked and why. The human resolves the blocker. Stage 10 reruns.
+
+### The Stress Test (Stage 11)
+
+After the final milestone's smoke test passes, run the stress test. This stage runs once per project, not per milestone. The product is functionally complete — now verify it holds up under sustained use and adverse conditions.
+
+Read `prompts/stress-test-protocol.md` for the full stress test protocol.
+
+**Prerequisites:**
+- The product must be running (same as Stage 10).
+- The test plan (Stage 6) must include a stress test section with load parameters and pass/fail thresholds.
+- Necessary stress testing tools must be available. If not, tell the human what to install and wait.
+
+**Protocol:**
+1. Read the test plan's stress test section. Each non-functional requirement becomes a stress test target.
+2. Execute tests across four categories: memory/resource leaks, concurrent operations, error recovery/timeouts, and boundary conditions at scale.
+3. For each category, follow the method specified in the test plan. Use Playwright MCP for web apps, bash for APIs/CLIs.
+4. Produce a stress test report with pass/fail per category and evidence.
+
+**Gate:**
+- All categories PASS: project complete. Run the cost agent if applicable.
+- Any category FAIL: each failure becomes a fix task. Run fix tasks through Stage 9, then rerun Stage 11 — all categories, not just the failures. A fix for concurrency might introduce a memory leak.
+- The project is not complete until all stress test categories pass.
+
+### Cost Assessment (Post-Project)
+
+After Stage 11 passes and the project is complete, optionally spin up cost-agent. The cost agent reads the shipped codebase, infrastructure configuration, and dependency manifests to surface cost reduction opportunities. It does not gate any stage and does not drive build decisions. Its output is a recommendations document for the human.
+
+Read `prompts/cost-agent.md` for the full cost assessment protocol.
+
+The cost agent may also be invoked ad hoc at the human's request for any running system.
 
 **Ad-hoc fixes during testing:** When the human notices something during the smoke test that isn't a walkthrough failure — a color that's wrong, a label that's confusing, spacing that's off — handle it based on scope. If the fix is cosmetic and doesn't change behavior, apply it and note it in the smoke test report. If the fix changes behavior or touches logic, create a fix task. Either way, include the change in the commit.
 
@@ -198,7 +303,7 @@ After each agent returns output, you verify the gate before advancing.
 - Scope compliance: were only files in the task's Files section modified?
 - Test execution: did all tests actually pass (verified by output, not self-report)?
 - Completed section: present, with date, deviations, and insight/implication?
-- Namespace check: do any proposed task filenames collide with existing files in the tasks directory? If yes, add a milestone prefix before writing.
+- Directory check: does the milestone directory exist? If not, create it before any agent writes to it. Verify all agent output for this milestone is written to the correct milestone directory.
 
 ### Judgment Checks (gate fitness — is this output substantive enough to advance?)
 
@@ -220,8 +325,10 @@ After each wave of parallel tasks completes and passes gate checks, you consolid
 
 1. Read the Completed section of every task in the wave.
 2. Extract any decisions logged there.
-3. Assign sequential numbers starting from the current max in DECISIONS.md.
-4. Append all decisions from the wave to DECISIONS.md in a single write.
+3. Assign sequential numbers starting from the current max in the milestone's DECISIONS.md.
+4. Append all decisions from the wave to the milestone's DECISIONS.md in a single write.
+
+After a milestone completes (smoke test passes), consolidate the milestone's DECISIONS.md into the project-level DECISIONS.md. The project-level file is the authoritative, cross-milestone record.
 
 This prevents number collisions from parallel agents. It also means DECISIONS.md is updated at wave boundaries, not mid-wave — which matches the loop model (inner loop produces signals, middle loop consolidates them).
 
@@ -242,6 +349,7 @@ These are the modes that manifest at your level — across agents, across stages
 | Confidence Bluff | Never accept "tests pass" without test output. Run the suite or require the agent to show the output. |
 | Decision Collision | During parallel builds, verify DECISIONS.md was not written to by multiple agents in the same wave. If collision detected, deduplicate by reading task Completed sections as the source of truth and rewriting the affected range. |
 | Big Bang Integration | A brief with multiple milestones is being built in a single pass without per-milestone smoke tests. If the brief decomposed into 3+ milestones and you're building them all before smoke testing any, stop. Run the pipeline per milestone. |
+| Accumulating Fragility | The SDM flags that continuing the milestone is creating maintenance complexity or cascading bug risk faster than it's creating value. When the SDM's refactoring assessment triggers, halt the build and surface to the human. Do not continue building on a foundation the SDM has flagged as structurally unsound. |
 
 ## SDM Trigger Rules
 
@@ -252,6 +360,8 @@ The SDM runs at three points, not one:
 **2. Post-milestone smoke test:** After each milestone's Stage 10 completes, spin up sdm-agent with: the smoke test results (pass/fail with evidence), the completed task files from this milestone, and the codebase diff. The SDM produces an updated codebase context document that includes what the milestone revealed about system constraints. This updated document becomes input for the next milestone's SWE.
 
 **3. Mid-build (mandatory when threshold is hit):** When 3+ task escalations in a single milestone are related, or when a task-agent's insight/implication note flags a system-level concern, spin up sdm-agent for mid-build synthesis. This trigger is mandatory — when the escalation count hits the threshold, run the SDM. Do not treat it as discretionary.
+
+At every trigger point, the SDM also runs a **refactoring assessment** — evaluating whether the milestone is accumulating maintenance complexity or cascading bug risk. If the SDM determines that continuing the milestone would create a codebase where fixing one bug has a high probability of creating a new bug, or where the cost of adding the next feature exceeds the cost of restructuring, it halts the milestone. This is a Tier 3 decision — surface the SDM's assessment to the human with the evidence, the refactoring scope, and the cost of continuing vs. restructuring. Do not resume the build until the human decides whether to pause and refactor, continue with acknowledged risk, or restructure the remaining scope. See `prompts/sdm-agent.md` for the full refactoring assessment protocol.
 
 Additional triggers:
 - The XRD proposes changes to existing files (after Stage 3, before Stage 8)

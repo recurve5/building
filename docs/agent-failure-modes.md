@@ -10,7 +10,7 @@ Failure modes cluster by development loop timescale (per Yegge/Kim's three-loop 
 
 **Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.**
 
-**Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration.**
+**Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.**
 
 ## The Test Cheat
 
@@ -192,3 +192,13 @@ Ask: "Am I designing this system to mirror what the output looks like, or to mir
 **The signature:** The smoke test fails on multiple steps simultaneously. The root cause is a single issue — a config bug, a wiring omission, a budget overflow — that existed before the first task started. Every task built on top of it. The fix is small but discovering it required building everything first. Four build cycles passed all tests. Four build cycles failed for the user.
 
 **How to catch it:** Decompose briefs into milestones. Each milestone produces working software the user can touch. Smoke test after each milestone. Run the SDM after each milestone's smoke test to reassess the codebase for the next milestone. Integration problems surface at the first milestone, not the last. See `orchestrator.md` Stage 0 (Milestone Decomposition) and Decision 27.
+
+## The Accumulating Fragility
+
+**What it is:** The milestone keeps building features on a codebase that is becoming structurally unsound. Each new task completes and passes its tests, but the codebase is reaching a state where fixing one bug has a high probability of creating a new bug, or where adding the next feature costs more than restructuring what exists. The individual tasks succeed. The project fails — not with a crash, but with a codebase that becomes unmaintainable.
+
+**Why it happens:** Each task is scoped and tested independently. The task-agent sees only its own files and contracts. It builds the feature, writes the tests, and reports done. No individual task produces a bad outcome. But across tasks, structural problems accumulate: multiple tasks work around the same limitation, implicit coupling grows between components, test setup complexity escalates, and files take on responsibilities beyond their original scope. No single task causes the fragility. Every task contributes to it.
+
+**The signature:** Completed sections across recent tasks share a theme — different tasks flagging the same structural concern from different angles. Bug fixes in one area routinely break something in another. Test setup requires increasingly elaborate mocking or state management. New code takes longer to write not because the feature is complex, but because understanding the existing code is complex. Agents (or developers) spend more time reading than writing.
+
+**How to catch it:** The SDM runs a refactoring assessment at every trigger point (mid-build synthesis, post-milestone reassessment, task escalation routing). Two specific conditions trigger a milestone halt: (1) maintenance complexity accumulation — the cost of adding the next feature exceeds the cost of restructuring, and (2) cascading bug risk — fixing one bug has a high probability of creating a new bug. When either condition is met, the SDM halts the milestone and surfaces the assessment to the human as a Tier 3 decision. See `prompts/sdm-agent.md` for the full assessment protocol and signal list.

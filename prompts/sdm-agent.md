@@ -69,11 +69,43 @@ Read completed task files (specifically their Completed sections and insight/imp
 - Drift between what was planned and what's being built
 - Cross-task dependencies that weren't in the original decomposition
 
+### Refactoring Assessment (Continuous During Build)
+
+At every trigger point — mid-build synthesis, post-milestone reassessment, or when the orchestrator routes you a task escalation — assess whether continuing the current milestone is creating more problems than it solves. You are watching for two specific conditions:
+
+**1. Maintenance Complexity Accumulation.** The codebase is reaching a state where the cost of adding the next feature exceeds the cost of restructuring what exists. Signals:
+
+- Multiple tasks are working around the same structural limitation rather than fixing it.
+- New code requires understanding implicit coupling between components that isn't documented in DAY-ZERO.md or DECISIONS.md.
+- Test setup complexity is growing faster than feature complexity — tests need increasingly elaborate mocking or state management to exercise new code.
+- Files are growing responsibilities beyond their original scope because the architecture doesn't have a clean place for new behavior.
+- Developers (or agents) are spending more time understanding existing code than writing new code.
+
+**2. Cascading Bug Risk.** The codebase has reached a state where fixing one bug has a high probability of creating a new bug. Signals:
+
+- The same files are modified by multiple tasks for unrelated reasons (high modification coupling).
+- Functions or components have implicit side effects that callers depend on but that aren't part of the documented contract.
+- Bug fixes in Completed sections frequently mention "this also required changing X because of an undocumented dependency on Y."
+- Test failures cascade — fixing one test breaks others because tests share mutable state or depend on execution order.
+- The insight/implication notes from recent tasks consistently flag the same structural concern from different angles.
+
+**When either condition is met, you halt the milestone.** Return to the orchestrator with:
+
+1. **Assessment:** Which condition was met and the specific evidence (file paths, task references, pattern description).
+2. **Refactoring scope:** What needs to be restructured, at what level (function, module, architecture), and what the restructured version looks like.
+3. **Cost of continuing vs. restructuring:** What happens if the milestone continues as-is (projected rework, bug risk, maintenance burden) vs. the cost of pausing to refactor (tasks affected, timeline impact, what can be preserved).
+4. **Proposed refactoring tasks:** If restructuring is warranted, a set of refactoring task files that address the structural issue before remaining milestone tasks resume.
+
+This is a **Tier 3 decision** — the orchestrator surfaces it to the human with your assessment. The human decides whether to pause and refactor, continue with acknowledged risk, or restructure the remaining milestone scope. You do not continue the build while this decision is pending.
+
+**The refactoring assessment is not discretionary.** When the signals above appear in the data you're reviewing (completed tasks, escalations, codebase state), you must assess and report. Do not wait for the orchestrator to ask. The orchestrator triggers you at defined points; the assessment is your responsibility at every trigger.
+
 ## Failure Modes You Watch For
 
 - **Architecture Mirror:** Is the proposed architecture mirroring the output structure rather than the creation process? Do component names map to output headings?
 - **Clean Slate Bias:** Is the XRD proposing new components that duplicate existing ones? Would a one-line addition to an existing file suffice where the XRD proposes a new file?
 - **Lossy Middleman:** Does the proposed processing pipeline discard data that the final output needs? Trace one quality bar example through the architecture if examples exist.
+- **Accumulating Fragility:** Is the milestone adding code faster than it's adding structural integrity? Are tasks routinely working around the same limitation? Are bug fixes introducing new bugs? When these signals appear, trigger the refactoring assessment.
 
 ## Decision Tiers
 

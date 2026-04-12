@@ -46,11 +46,9 @@ Open design questions for the building system, extracted from the original north
 
 ### docs/build-process.md and orchestrator.md Overlap
 
-**Question:** Both files describe the 10-stage pipeline in detail with slightly different framing. Should one become the reference document (stage definitions, gate criteria, walkthrough protocols) while the other becomes the operational playbook (how to run the pipeline, context scoping, agent routing)?
+**Resolved (2026-04-12).** The divergence between the two files became material — `orchestrator.md` had Stages 9.5, 10, 11, security reviews, stress tests, cost assessment, milestone directories, and the SDM refactoring halt, while `build-process.md` still described the old 8-stage structure. A human reading `build-process.md` to understand the pipeline would get a materially incomplete picture.
 
-**What exists today:** `orchestrator.md` is what agents consume — the orchestrator reads it at session start. `docs/build-process.md` is the human-readable reference with additional context on handoff protocols, existing codebase guidance, and the writing pipeline. No agent prompt references `docs/build-process.md`. Both files describe the same stages with the same gates, creating a maintenance burden where updates to one may not propagate to the other. `orchestrator.md` is authoritative when they diverge.
-
-**What would trigger building it:** A divergence between the two files causes a missed gate or a misunderstanding — an agent follows orchestrator.md's version of a stage while a human follows docs/build-process.md's version and they produce different results. Until that happens, add a note to the top of `docs/build-process.md`: "The orchestrator's operational version of this pipeline is in `orchestrator.md`. If they diverge, `orchestrator.md` is authoritative."
+**Resolution:** `build-process.md` was rewritten to match `orchestrator.md`'s current pipeline (Stages 0–11 plus post-project cost assessment). The two files now serve distinct audiences: `orchestrator.md` is the operational playbook for agents (context scoping rules, gate enforcement, agent routing, relay protocol). `docs/build-process.md` is the human-readable reference with additional context on handoff protocols, existing codebase guidance, the writing pipeline, and design rationale that agents don't need. Both files describe the same stages. `orchestrator.md` remains authoritative if they diverge again.
 
 ### Guardrails as a Standard Project File
 

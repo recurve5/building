@@ -16,9 +16,11 @@ The build system uses a multi-agent orchestration model. Each role runs as a sep
 | Product | `prompts/product-agent.md` | Writes PRDs, resolves product questions, handles pushback responses |
 | SWE | `prompts/swe-agent.md` | Writes XRDs, decomposes tasks, proposes architecture |
 | Peer Reviewer | `prompts/peer-review-agent.md` | Reviews PRD+XRD as a matched set, surfaces contradictions and gaps |
-| Tester | `prompts/tester-agent.md` | Writes test plans from the PRD |
-| SDM | `prompts/sdm-agent.md` | Assesses existing codebases, provides context to SWE |
+| Tester | `prompts/tester-agent.md` | Writes test plans from the PRD, including stress test specifications |
+| Security | `prompts/security-agent.md` | Reviews XRD for architectural security gaps, reviews code for implementation vulnerabilities |
+| SDM | `prompts/sdm-agent.md` | Assesses existing codebases, provides context to SWE, halts milestones when refactoring is needed |
 | Task | `prompts/task-agent.md` | Executes individual build tasks |
+| Cost | `prompts/cost-agent.md` | Post-project assessment of cost reduction opportunities |
 
 Agents do not talk to each other directly. All communication goes through the orchestrator.
 
@@ -72,16 +74,33 @@ If you cannot formulate a question that requires product judgment, the issue is 
 
 - Orchestrator definition: `orchestrator.md`
 - Agent prompts: `prompts/` directory
-- Decisions log: `DECISIONS.md` in project root
-- Open items for review: `OPEN-ITEMS.md` in project root
-- Day Zero contracts: `DAY-ZERO.md` in project root
-- Task files: `tasks/` directory, numbered sequentially
-- Tests: colocated or in `tests/` matching source structure
-- Reference docs: `docs/` directory
 - Cross-project decisions: `decisions.md`
 - Task format: `task-template.md`
 - Writing quality: `writing-failure-modes.md`
-- Archive: `archive/` with date-stamped subdirectories
+
+### Project-Level Files (project root)
+- `CLAUDE.md` — Project status, pipeline state, cumulative context
+- `DECISIONS.md` — Consolidated decisions log (authoritative, assembled from milestone decisions)
+- `OPEN-ITEMS.md` — Open Tier 3 items
+
+### Milestone Directories
+
+Every milestone gets its own directory named `m<number>-<project>-<goal>/`. The folder structure is self-documenting — browsing the project tells you what was built and when.
+
+```
+m1-nacre-docx-ingestion/
+  PRD.md, XRD.md, peer-review.md, test-plan.md
+  security-review.md, security-code-review.md
+  smoke-test-report.md
+  DAY-ZERO.md, DECISIONS.md, OPEN-ITEMS.md
+  tasks/
+```
+
+See `orchestrator.md` Stage 0 for the full directory structure spec.
+
+### Other Conventions
+- Tests: colocated or in `tests/` matching source structure
+- Reference docs: `docs/` directory
 
 ## Insight/Implication Format
 
@@ -102,7 +121,7 @@ See `docs/agent-failure-modes.md` for the full catalog. Modes are assigned to th
 
 **Middle loop (orchestrator + sdm-agent):** Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.
 
-**Outer loop (sdm-agent):** Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration.
+**Outer loop (sdm-agent):** Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.
 
 ## System Maturity
 

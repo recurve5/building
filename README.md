@@ -1,121 +1,183 @@
-# Building
+# building
 
-A judgment layer for AI-assisted software development. Seven agents, a pipeline, and a set of documents that force the thinking before the code.
+**What do you call it?**
 
-AI agents write code fast. What they don't do is question the spec, catch contradictions from three sessions ago, or notice that the architecture makes it impossible to hit the quality bar. Those aren't model limitations. They're what happens when you skip the part where someone decides what good looks like.
+**building.**
 
-Building is the process layer between your idea and the code. It applies what organizations learned over decades about product development — PRDs, engineering responses, peer reviews, test plans, decision logs, role separation — to a context where a single person and a set of AI agents are doing the work.
+**That is the name.**
 
-## Why This Exists
+This repo is for building software with AI without pretending the hard part is typing.
 
-AI collapsed the cost of execution without collapsing the cost of judgment. Agents write code fast and cheap, but deciding what to build, recognizing when to stop, and catching the error that looks like a feature — that didn't get cheaper. It got harder, because the speed that eliminated the effort also eliminated the thinking that used to happen as a byproduct of the effort.
+---
 
-When you spend two weeks building something by hand, you notice problems along the way. When an agent builds it in twenty minutes, those problems still exist. You just don't find them until a user does.
+## What this is
 
-Building exists because the bottleneck moved. It's no longer in the typing. It's in the judgment. The pipeline is designed to make the judgment happen before the typing starts.
+building is a judgment layer for AI-assisted software development.
 
-## How It Works
+It does not try to replace engineering taste, product judgment, or technical decision-making. It gives those things a structure.
 
-Seven agents, each with a scoped role and isolated context, connected through an orchestrator that manages the pipeline. Agents do not talk to each other directly — all communication routes through the orchestrator, which enforces gates, scopes context, and routes decisions.
+The framework uses scoped agents, shared documents, explicit gates, and review steps to help you move from idea to working software with less drift, less thrash, and fewer confident mistakes.
 
-The pipeline: **milestone decomposition** → **idea brief** → **PRD** → **XRD** → **pushback resolution** → **peer review** → **test plan** → **SDM review** (existing codebases) → **task decomposition** → **build** → **smoke test**. Stages run per milestone, not per brief. Each milestone produces working software the user can touch and is smoke tested before the next milestone begins. Steps can be fast but they don't get skipped. The orchestrator runs end to end — planning through verified product — stopping only for gate failures or decisions that require human judgment.
+**The models can generate. You still have to build.**
 
-### The Agents
+---
 
-| Agent | File | What It Does |
-|-------|------|-------------|
-| **Orchestrator** | `orchestrator.md` | Manages the pipeline. Spins up agents with scoped context, enforces gates between stages, routes questions between agents, surfaces Tier 3 decisions to the human. Does not write code or make product decisions. |
-| **Product** | `prompts/product-agent.md` | Owns the what and why. Writes PRDs. Responds to engineering pushback with product-grounded decisions. Attempts to resolve issues before escalating — its job is to have a position, not to defer. |
-| **SWE** | `prompts/swe-agent.md` | Owns the how. Writes XRDs that respond to the PRD with architecture, pushback, and a build plan. Decomposes work into agent-executable tasks. Pushes back where it matters, framed as insight/implication with product-level tradeoffs. |
-| **Peer Reviewer** | `prompts/peer-review-agent.md` | Owns quality gates. Reads the PRD and XRD as a matched set in a fresh context. Surfaces contradictions, gaps, unstated assumptions, and architecture-product mismatches. |
-| **Tester** | `prompts/tester-agent.md` | Owns validation. Writes test plans that translate product intent into verifiable assertions. Prioritizes by risk, not feature order. Routes contradictions to the agent that owns the claim. |
-| **SDM** | `prompts/sdm-agent.md` | Owns codebase context. For existing codebases, assesses what exists and produces a context document so the SWE doesn't propose a rewrite when a modification would do. Watches for Architecture Mirror and Clean Slate Bias. |
-| **Task** | `prompts/task-agent.md` | Executes a single task. Reads the task file, writes code, writes tests, reports done with an insight/implication note. Scope is exactly what the task file says — nothing more. |
+## What this is not
 
-### Decision Tiers
+building is not:
+- a magic prompt
+- an autonomous software factory
+- a substitute for technical judgment
+- a guarantee that generated code is correct
+- an agent runtime pretending process does not matter
+
+**If you want "one weird trick" for replacing software teams, this is the wrong repo.**
+
+This framework assumes the opposite: good output depends on good structure, good constraints, and good review.
+
+---
+
+## Why this exists
+
+AI made code generation dramatically cheaper. It did not make good decisions free.
+
+Most failures in AI-assisted development do not come from the model being unable to write syntax. They come from vague goals, muddled ownership, skipped review, missing constraints, false confidence, and local progress that hides global incoherence.
+
+**Execution got cheaper. Judgment did not.**
+
+building exists to handle that gap.
+
+---
+
+## How it works
+
+Nine agents. Each has one job and only the context it needs to do that job.
+
+An orchestrator runs the pipeline: idea → milestones → PRD → architecture → security review → pushback → peer review → test plan → build → security code review → smoke test → stress test. Agents do not talk to each other. All communication routes through the orchestrator, which enforces gates and surfaces decisions that require a human.
+
+The work moves through stages. Each stage produces an artifact. Each artifact gets reviewed before the next stage starts. **Nothing advances on vibes.**
+
+The pipeline runs per milestone, not per project. Each milestone produces working software you can touch. Integration problems surface at the first milestone, when the fix is cheap, not the last, when it is not.
+
+### The agents
+
+| Agent | What it does |
+|-------|-------------|
+| **Orchestrator** | Runs the pipeline. Enforces gates. Routes decisions. Does not write code or make product calls. |
+| **Product** | Owns the what and why. Writes PRDs. Responds to pushback with product-grounded decisions. Its job is to have a position, not to defer. |
+| **SWE** | Owns the how. Writes engineering response documents. Pushes back where it matters. Decomposes work into agent-executable tasks. |
+| **Peer Reviewer** | Reads the PRD and architecture doc as a matched set in a fresh context. Surfaces contradictions, gaps, and unstated assumptions. |
+| **Tester** | Translates product intent into verifiable assertions, including stress test specs. Prioritizes by risk, not feature order. |
+| **Security** | Reviews architecture for security gaps, reviews code for vulnerabilities. Critical findings block the build. |
+| **SDM** | Owns codebase context and structural integrity. Can halt a milestone when continuing would create more problems than it solves. |
+| **Task** | Executes a single task. Reads the task file, writes code, writes tests, reports done. Scope is exactly what the task file says. |
+| **Cost** | Post-project only. Reviews shipped code and infrastructure for cost reduction opportunities. Surfaces recommendations, does not drive decisions. |
+
+### Decision tiers
 
 Every choice during a build falls into one of three tiers:
 
 - **Tier 1 — Just do it.** Craft decisions. No logging needed.
 - **Tier 2 — Do it and log it.** Implementation choices worth documenting. The agent decides and logs the rationale.
-- **Tier 3 — Surface for review.** Changes to user experience or inherited constraints. Must be framed as a user story with insight/implication before reaching the human. Most items labeled Tier 3 become Tier 2 when forced through this lens.
+- **Tier 3 — Surface for review.** Changes to user experience or inherited constraints. Framed as a user story with tradeoffs before reaching the human.
 
-The system gets smarter over time: after each project, Tier 3 patterns where the human consistently makes the same call become Tier 2 rules.
+Most items labeled Tier 3 become Tier 2 when forced through this lens. The system gets smarter over time: Tier 3 patterns where the human consistently makes the same call become Tier 2 rules.
 
-### Context Isolation
+---
 
-Agents do not share context. This is mechanical, not behavioral. Agents trained via reinforcement learning pull context and resolve problems — when an inner-loop agent has access to outer-loop context, it re-litigates closed decisions and picks up paused work. Instructions to "stay in scope" fight the training. The constraint has to be enforced through scoped file access and fresh context windows, not through instructions the agent is incentivized to ignore.
+## Agent failure modes
 
-Files are the interface between agents, not shared context.
+Most frameworks pretend agents do not fail. This one keeps a list.
 
-## What This Isn't
-
-This is not an agent runtime. It doesn't manage processes, coordinate parallel execution, or monitor agent health. Tools that do those things well are solving a real problem at a different layer. Building operates above that layer — it's the set of documents and protocols that tell agents what to build, in what order, and how to know when it's right. You could run this pipeline on top of any agent execution layer, or with a single Claude Code session and manual orchestration, which is how it works today.
-
-## The Files
-
-```
-~/building/
-  CLAUDE.md                      # Master build file. Core principles, decision tiers, quality bar.
-  orchestrator.md                # Pipeline state machine, gates, context scoping, decision routing.
-  starter-prompt.md              # One-line kickoff for new sessions.
-  decisions.md                   # Cross-project principles. Append-only.
-  task-template.md               # Format for agent-executable task files.
-  writing-failure-modes.md       # Failure modes for prose. Consult before publishing.
-  prompts/
-    product-agent.md             # PRD writing, pushback responses, product questions.
-    swe-agent.md                 # XRD writing, task decomposition, architecture.
-    peer-review-agent.md         # Document review, contradiction and gap detection.
-    tester-agent.md              # Test plan writing.
-    sdm-agent.md                 # Codebase assessment, mid-build synthesis.
-    task-agent.md                # Single-task code execution.
-    smoke-test-protocol.md       # Playwright MCP smoke test protocol for Stage 10.
-  docs/
-    roadmap.md                   # Open design questions. What hasn't been built yet.
-    agent-failure-modes.md       # Catalog of AI agent failure modes (18 entries).
-    automation.md                # Gate Runner and automation layer spec.
-    build-process.md             # Original pipeline reference.
-```
-
-## How to Use It
-
-### New Project (Greenfield)
-
-1. Copy or clone these files into `~/building/`.
-2. Create your project directory with a `CLAUDE.md` that references the master files: `Read ~/building/orchestrator.md. You are the orchestrator.`
-3. Open Claude Code in your project directory.
-4. Give it your idea brief — one sentence to a full page.
-5. The orchestrator runs the pipeline: spins up the product agent (which will ask you to confirm its understanding of the brief), produces the PRD, hands it to the SWE agent for the XRD, runs peer review, produces the test plan, decomposes into tasks, and builds. You'll be asked for input at Tier 3 decision points. Everything else runs autonomously.
-
-### Existing Codebase
-
-Same as above, but tell the orchestrator: "This is an existing codebase." It will spin up the SDM agent before the XRD stage to assess what exists — architecture, fragile areas, change surface, patterns and conventions. The SDM produces a codebase context document that the SWE agent receives alongside the PRD, preventing rewrites where modifications would suffice.
-
-If the project was previously built with an older version of this framework (existing PRDs, XRDs, task files), no migration is needed. The SDM reads old docs as codebase context. Add a one-paragraph status section to your project's `CLAUDE.md` describing what's been built and what's next.
-
-### What to Expect
-
-The orchestrator will stop for your input at these points:
-- **After the product agent's playback** — confirming it understood your idea brief correctly.
-- **Tier 3 decisions** — items that genuinely require your judgment about product direction, framed as user stories with tradeoffs.
-- **Context window limits** — if the session runs long, the orchestrator writes state to files and tells you exactly how to continue.
-
-Between those points, the pipeline runs autonomously.
-
-## Agent Failure Modes
-
-A growing catalog of the specific ways AI agents fail during builds. Each entry names the pattern, explains why it happens, and describes how to catch it. Eighteen entries across three loop levels:
+A growing catalog of the specific ways AI agents fail during builds — named from real projects, not theory. Each entry describes the pattern, explains why it happens, and describes how to catch it. Nineteen entries across three loop levels:
 
 **Inner loop** (during task execution): Test Cheat, Loop of Despair, Scope Creep, Ghost Refactor, Clean Slate Bias, Dependency Grab.
 
 **Middle loop** (across tasks and sessions): Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.
 
-**Outer loop** (architectural): Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration.
+**Outer loop** (architectural): Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.
 
 See `docs/agent-failure-modes.md` for the full catalog.
 
-## Background
+---
 
-This started from 27 years of product development at Amazon and a few months of getting bitten by the specific ways AI agents fail. A third of this process was defined by the LLM itself. The system is still evolving. When a new failure mode appears, it gets added. When a protocol breaks in practice, it gets fixed. These are working documents, not a finished framework.
+## How to use it
+
+### New project
+
+1. Clone this repo to `~/building/`.
+2. Create your project directory with a `CLAUDE.md` that references the master files: `Read ~/building/orchestrator.md. You are the orchestrator.`
+3. Open Claude Code in your project directory.
+4. Give it your idea brief — one sentence to a full page.
+5. The orchestrator runs the pipeline. You'll be asked for input at Tier 3 decision points. Everything else runs autonomously.
+
+### Existing codebase
+
+Same as above, but tell the orchestrator: "This is an existing codebase." The SDM agent assesses what exists before the architecture stage — preventing rewrites where modifications would suffice.
+
+### What to expect
+
+The orchestrator will stop for your input at these points:
+- **After the product agent's playback** — confirming it understood your brief correctly.
+- **Tier 3 decisions** — items that genuinely require your judgment, framed as user stories with tradeoffs.
+- **Context window limits** — the orchestrator writes state to files and tells you exactly how to continue.
+
+Between those points, the pipeline runs autonomously.
+
+---
+
+## The files
+
+```
+~/building/
+  CLAUDE.md                      # Core principles, decision tiers, quality bar.
+  orchestrator.md                # Pipeline, gates, context scoping, decision routing.
+  decisions.md                   # Cross-project principles. Append-only.
+  task-template.md               # Format for agent-executable task files.
+  prompts/
+    product-agent.md             # PRD writing, pushback responses.
+    swe-agent.md                 # Architecture, task decomposition.
+    peer-review-agent.md         # Contradiction and gap detection.
+    tester-agent.md              # Test plans, stress test specs.
+    security-agent.md            # Security review (architecture + code).
+    sdm-agent.md                 # Codebase assessment, refactoring assessment.
+    task-agent.md                # Single-task execution.
+    cost-agent.md                # Post-project cost assessment.
+    smoke-test-protocol.md       # Smoke test protocol (Stage 10).
+    stress-test-protocol.md      # Stress test protocol (Stage 11).
+  docs/
+    agent-failure-modes.md       # 19 failure mode entries.
+    automation.md                # Gate Runner and automation layer.
+    build-process.md             # Human-readable pipeline reference.
+    roadmap.md                   # Open design questions.
+```
+
+Each project organizes its work into milestone directories:
+
+```
+~/your-project/
+  CLAUDE.md                      # Project status, pipeline state.
+  DECISIONS.md                   # Consolidated project decisions.
+  m1-projectname-first-goal/     # Milestone 1
+    PRD.md, XRD.md, peer-review.md, test-plan.md
+    security-review.md, smoke-test-report.md
+    DAY-ZERO.md, DECISIONS.md
+    tasks/
+  m2-projectname-second-goal/    # Milestone 2
+    ...
+  src/                           # Code lives where the codebase puts it.
+```
+
+---
+
+## Status
+
+This is an evolving framework, built from real projects and refined when it breaks. Some parts are stable. Some are still moving. When a new failure mode appears, it gets added. When a protocol fails in practice, it gets fixed.
+
+**It is called building, and it is still building.**
 
 I wrote about earlier versions of this system in [CLAUDE.md isn't enough](https://open.substack.com/pub/joshbuilds/p/claudemd-isnt-enough). If you're building with AI agents and you've hit a failure mode you haven't seen written about, open an issue.
+
+---
+
+**building is a framework for building software with AI when you do not want to confuse generation with judgment.**
