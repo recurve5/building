@@ -176,7 +176,7 @@ This is an evolving framework, built from real projects and refined when it brea
 
 **It is called building, and it is still building.**
 
-I wrote about earlier versions of this system in [CLAUDE.md isn't enough](https://open.substack.com/pub/joshbuilds/p/claudemd-isnt-enough). If you're building with AI agents and you've hit a failure mode you haven't seen written about, open an issue.
+I wrote about earlier versions of this system on [Substack](https://substack.com/@shermanjoshua). If you're building with AI agents and you've hit a failure mode you haven't seen written about, open an issue.
 
 ---
 
