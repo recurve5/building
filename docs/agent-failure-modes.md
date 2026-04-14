@@ -8,7 +8,7 @@ Failure modes cluster by development loop timescale (per Yegge/Kim's three-loop 
 
 **Inner loop** (during task execution, seconds to minutes) — These happen while the agent is writing code. Detection during execution is cheaper than detection at the gate: **Test Cheat, Loop of Despair, Scope Creep, Ghost Refactor, Clean Slate Bias, Dependency Grab.**
 
-**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.**
+**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock, Token Drift.**
 
 **Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.**
 
@@ -150,6 +150,21 @@ Ask: "Am I designing this system to mirror what the output looks like, or to mir
 **How to catch it:** Diff audit against the task's Files section (same as Scope Creep). The distinction: Scope Creep is the agent doing extra work it wasn't asked for. Heroic Unblock is the agent doing another task's work because it was blocked. Both are caught the same way — the diff shows files outside scope. The response differs: Scope Creep means "revert the extras." Heroic Unblock means "revert the extras and mark this task blocked."
 
 **How to prevent it:** Context scoping. The agent that can't see the dependency can't resolve it. The task's Context field limits what the agent reads. The `Depends on` field gates whether the task starts. Together, they remove the opportunity for heroism. See `prompts/peer-review-agent.md` (Orchestration) and `task-template.md` (Context field, dependency gate).
+
+## The Token Drift
+
+**What it is:** UI tasks ship with hardcoded visual values — hex colors, pixel sizes, typography choices, inline styles — instead of references to `design-tokens.md`. Each task looks fine in isolation. The button renders. The card has padding. The link is blue. But the blues are slightly different blues, the paddings are slightly different paddings, and the cards have three different shadow recipes depending on which task built them. The product has a visual language on day one and loses it by milestone three. The decay is invisible in any single diff and obvious the first time someone opens two screens side by side.
+
+**Why it happens:** Task-agents optimize locally. A UI task says "build the settings panel" and the agent reads an existing button component, sees `#3B82F6`, and types `#3B82F6` into the new component. It works. The test passes. The task is done. The agent never sees the system-level consequence — that every subsequent task that needs "a blue" will do the same thing with a slightly different blue, and that the token file existed to prevent exactly this. Each individual drift is a Tier 1 decision ("use the blue I see here") that should have been no decision at all ("reference `--color-accent-primary`").
+
+**The signature:** `grep` for hex values in the UI directories returns dozens of hits that are not defined in `design-tokens.md`. Five screens have five slightly different grays. Two buttons that should match do not. The token file exists but is unused — either because it was written after the first UI tasks landed, or because tasks were not told to read it. Design-agent's Stage 10 enforcement run finds a long fix list.
+
+**How to catch it:** Two layers of enforcement.
+
+1. **Inner loop (mechanical).** When `design-tokens.md` exists, the swe-agent adds it to the Context field of every UI task during Stage 8 decomposition. The task-agent reads it and treats hardcoded visual values as a scope violation — the orchestrator rejects completions the same way it rejects files-outside-scope modifications. Every new hex in a diff must resolve to a token reference, or the task bounces back.
+2. **Middle loop (semantic).** Design-agent runs in Stage 10 enforcement mode against the token file. It uses Playwright `browser_evaluate` to read computed styles off rendered components and compares them against the token values. Mismatches become fix tasks that run through Stage 9 before the milestone advances. This catches drift that the mechanical inner-loop check misses — values that look token-correct in the source but render differently because of a CSS cascade, a framework default, or a late override.
+
+**How to prevent it:** The token file is a contract, not documentation. It lives at the project root (alongside `DECISIONS.md`) and is referenced by every agent that touches UI. The first UI milestone that establishes the token file graduates visual values from Tier 3 decisions (case-by-case) to Tier 1 decisions (look it up). The ratchet only works if the file is actually given to the agents that need it — swe-agent, tester-agent, task-agent, peer-review-agent, design-agent — which is the orchestrator's responsibility in Stage 2 context scoping.
 
 ## The Clean Slate Bias
 
