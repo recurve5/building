@@ -15,15 +15,15 @@ Each stage has an agent, inputs, outputs, and a gate. You advance to the next st
 | 0. Milestone Decomposition | product-agent | Idea brief | Milestone list with sequencing rationale | Each milestone is independently valuable to the user. Milestones are sequenced so integration-revealing work goes first. Human confirms the decomposition. |
 | 1. Idea Brief | — | Human provides | Idea brief (text or file) | Brief exists and has enough substance for product-agent to work from |
 | 2. PRD | product-agent | Idea brief (scoped to current milestone) | PRD file with Decisions Log | All required PRD sections present (10 for UI products, 8 for non-UI). For UI products: First-Use Walkthrough section present. Decisions Log exists. No unresolved Tier 3 items. |
-| 3. XRD + Security Review | swe-agent, security-agent | PRD | XRD file with architecture, pushback, build plan; Security assessment | Architecture section present. Quality Bar Trace present (if quality bar examples exist). Pushback section present. Build plan with tracks and phases. No Critical or High security findings unresolved. |
-| 4. Pushback Resolution | product-agent + swe-agent | PRD, XRD pushback items | Updated PRD Decisions Log, updated XRD | Every pushback item has a resolution. No unresolved Tier 3 items. |
+| 3. XRD + Specialist Reviews | swe-agent, security-agent, performance-agent | PRD | XRD file with architecture, pushback, build plan; security assessment; performance assessment | Architecture section present. Quality Bar Trace present (if quality bar examples exist). Pushback section present. Build plan with tracks and phases. No Critical or High security or performance findings unresolved. |
+| 4. Pushback Resolution | product-agent + swe-agent | PRD, XRD pushback items, security findings, performance findings | Updated PRD Decisions Log, updated XRD | Every pushback item has a resolution (SWE pushback, security findings, and performance findings all route through this loop). No unresolved Tier 3 items. |
 | 5. Peer Review | peer-review-agent | PRD, XRD | Review document with issues table | All high-severity issues resolved before proceeding. For UI products: User-Experience Gaps section present in review (peer reviewer independently walked the user journey). |
 | 6. Test Plan | tester-agent | PRD (primary), XRD (supplementary) | Test plan file with stress test section | Every PRD feature section has at least one test case. Stress test section present with load parameters and pass/fail thresholds. |
 | 7. SDM Review | sdm-agent | PRD, XRD, existing codebase (if applicable) | Codebase context document | Only for existing codebases. SDM confirms XRD fits existing architecture or flags structural conflicts. |
 | 8. Task Decomposition | swe-agent | XRD, test plan, peer review resolutions, SDM context (if exists) | DAY-ZERO.md + task files | Every task references only DAY-ZERO contracts. Every acceptance criterion maps to a test. User-story walkthrough passes. Controversy review complete: product-agent has identified and the human has resolved the top 5 decisions most likely to produce a user experience gap. |
 | 9. Build | task-agent (per task) | Task file + scoped context | Tested code + Completed section | Acceptance criteria pass. No files modified outside scope. Completed section with insight/implication present. |
-| 9.5. Security Code Review | security-agent | Source code, XRD, dependency manifests | Code security review with findings | No Critical or High security findings. Medium findings logged with remediation. |
-| 10. Smoke Test | orchestrator | Running product + PRD First-Use Walkthrough | Smoke test report with pass/fail per walkthrough step | Every walkthrough step passes against the running product. |
+| 9.5. Specialist Code Reviews | security-agent, performance-agent | Source code, XRD, dependency manifests | Security code review; performance code review | No Critical or High security or performance findings. Medium findings logged with remediation. |
+| 10. Smoke Test + Visual Enforcement | orchestrator, design-agent | Running product + PRD First-Use Walkthrough + `design-tokens.md` (if exists) | Smoke test report; visual audit report (if tokens exist) or debt report (if not) | Every walkthrough step passes against the running product. For UI milestones with a token file: all visual audit findings resolved. For UI milestones without a token file: debt report captured; design-pass recommendation written to `OPEN-ITEMS.md` if debt score exceeds threshold. |
 | 11. Stress Test | orchestrator | Running product + test plan stress test section | Stress test report with pass/fail per category | All stress test categories pass. Runs once after the final milestone's smoke test, not per milestone. |
 
 ## Pipeline Continuity
@@ -124,6 +124,7 @@ Do not give an agent files it doesn't need. Context isolation prevents failure m
 - SDM codebase context document (if exists, Stages 3 and 8)
 - Relevant entries from DECISIONS.md (technical decisions)
 - Test plan and peer review resolutions (Stage 8)
+- `design-tokens.md` from the project root, if it exists (Stages 3 and 8 for UI milestones)
 - Never: other tasks' files, OPEN-ITEMS.md, paused work
 
 **peer-review-agent receives:**
@@ -131,11 +132,14 @@ Do not give an agent files it doesn't need. Context isolation prevents failure m
 - PRD and XRD as documents (fresh context, no access to the conversations that produced them)
 - Test plan (if available)
 - Quality bar examples (if they exist)
+- `design-tokens.md` from the project root, if it exists (for UI milestones — reviewed as a matched set with PRD and XRD)
 - Never: source code, task files
 
 **tester-agent receives:**
 - PRD (primary source of truth)
 - XRD (supplementary, for implementation-revealed edge cases)
+- `design-tokens.md` from the project root, if it exists (for UI milestones — used to derive visual regression cases)
+- Performance-agent findings, if any (used to derive performance regression cases)
 - Never: source code, task files, peer review
 
 **sdm-agent receives:**
@@ -156,11 +160,38 @@ Do not give an agent files it doesn't need. Context isolation prevents failure m
 - Dependency manifests (package.json, requirements.txt, Cargo.toml, etc.)
 - Never: task files, conversations, test results
 
+**performance-agent receives (Post-XRD):**
+- PRD (for performance expectations — the non-functional requirements section)
+- XRD (for architecture, data flow, concurrency model, technology choices)
+- Never: source code, task files, test plans
+
+**performance-agent receives (Post-Build):**
+- Source code (full codebase relevant to this milestone)
+- XRD (for intended architecture)
+- Dependency manifests (for bundle analysis on web projects)
+- Never: task files, conversations, test results
+
+**design-agent receives (Audit + Redesign mode, design pass milestone):**
+- Screenshots of the running product (captured by the orchestrator via Playwright before invocation)
+- Prior `design-tokens.md` from the project root, if one exists
+- Prior milestone's PRD and First-Use Walkthrough (for intent)
+- Brand assets (logos, icons, source SVGs) from the project root or prior milestone directories
+- Reference images the human provided
+- Never: source code, XRD, task files, other agents' conversations
+
+**design-agent receives (Enforcement mode, Stage 10):**
+- `design-tokens.md` from the project root
+- Prototype files from prior design passes (visual references)
+- The running product (via Playwright MCP — computed-style inspection, not just screenshots)
+- The milestone's PRD (to know which surfaces the milestone touched)
+- Never: source code, task files, other agents' conversations
+
 **task-agent receives (per task):**
 - The single task file
 - DAY-ZERO.md
 - Files listed in the task's Context field
 - Relevant decisions from DECISIONS.md
+- `design-tokens.md` from the project root, if it exists and the task touches UI
 - Never: other task files, OPEN-ITEMS.md, PRD, XRD (the task file contains everything distilled from those)
 
 ## The Relay Protocol
@@ -181,8 +212,8 @@ When an agent has a question it can't resolve:
 
 This is the most important inter-agent exchange. It works like this:
 
-1. swe-agent produces the XRD with pushback items. Each item is framed as insight/implication with product-level tradeoffs.
-2. You take each pushback item and spin up product-agent with: the item, the relevant PRD section, and the instruction "respond to this pushback with a decision, framed as insight/implication to the product's user."
+1. swe-agent produces the XRD with pushback items. security-agent and performance-agent produce post-XRD findings (Critical and High severity). All three streams of items converge into the Stage 4 pushback loop. Each item is framed as insight/implication with product-level tradeoffs.
+2. You take each pushback item and spin up product-agent with: the item, the relevant PRD section, and the instruction "respond to this pushback with a decision, framed as insight/implication to the product's user." For security and performance findings, also route them to swe-agent for an architecture-level response — the SWE either accepts (will change the architecture) or defends with rationale (here is the tradeoff).
 3. product-agent responds. Most items self-resolve to Tier 2 when forced into insight/implication format grounded in the user story.
 4. Items that product-agent cannot resolve — because they require judgment about direction, resources, or strategy — are Tier 3. You surface these to the human.
 5. Once all items are resolved, you pass the resolutions to swe-agent to update the XRD.
@@ -197,15 +228,43 @@ Route the list to the human. The human resolves each item: accept, modify, or ch
 
 This review typically surfaces 3-5 scope changes and catches issues that structural review (peer review) and technical review (XRD pushback) miss — specifically, features that work correctly but produce invisible degradation, hard limits without overrides, and friction that scales with engagement.
 
-### Security Reviews (Stage 3 and Stage 9.5)
+### Specialist Reviews (Stage 3, Stage 9.5, Stage 10)
+
+Three specialist reviewers extend the pipeline with focused lenses: **security-agent** (security posture), **performance-agent** (user-perceived performance), and **design-agent** (visual layer). They do not own the pipeline — they inform it. Their findings route through the Stage 4 pushback loop (post-XRD findings) or become fix tasks (post-build findings) or reference a token file (design-agent enforcement). Treat them as a family; adding a new specialist (accessibility, for example) follows the same pattern.
+
+#### Security Reviews
 
 Security review runs at two points in the pipeline.
 
-**Post-XRD (parallel with Stage 3 output review):** After the swe-agent returns the XRD, spin up security-agent with the PRD and XRD. The security agent assesses the proposed architecture for threat surface, auth/authz design, trust boundary gaps, secrets management, and dependency risk. Critical and High findings are gate blockers — resolve them before advancing to Stage 4 (Pushback Resolution). Security findings that involve product decisions (e.g., what data to encrypt, what auth model to use) are routed through the pushback loop alongside SWE pushback items.
+**Post-XRD (Stage 3, parallel with peer review):** After the swe-agent returns the XRD, spin up security-agent with the PRD and XRD. The security agent assesses the proposed architecture for threat surface, auth/authz design, trust boundary gaps, secrets management, and dependency risk. Critical and High findings are gate blockers — resolve them before advancing to Stage 4 (Pushback Resolution). Security findings that involve product decisions (e.g., what data to encrypt, what auth model to use) are routed through the pushback loop alongside SWE pushback items.
 
 **Post-Build (Stage 9.5):** After all tasks in a milestone pass their gates and before the smoke test, spin up security-agent with the source code, XRD, and dependency manifests. The security agent reviews the implementation for injection surfaces, auth enforcement, secrets in code, insecure defaults, and vulnerability patterns. Critical and High findings block the smoke test — each becomes a fix task that runs through Stage 9 before proceeding. Medium findings are logged with remediation guidance and become tasks in the current or next milestone.
 
 Read `prompts/security-agent.md` for the full security review protocol.
+
+#### Performance Reviews
+
+Performance review follows the same template as security review — post-XRD architectural review, post-build code review. Performance-agent exists because a product can pass every functional test and still feel broken: a 200ms API response that blocks the UI thread is worse than a 500ms response that happens in the background.
+
+**Post-XRD (Stage 3, parallel with peer review and security review):** After the swe-agent returns the XRD, spin up performance-agent with the PRD and XRD. The performance agent assesses the proposed architecture for critical-path composition, sequential chains that could be parallel, caching fit, streaming capability, concurrency structure, and scale-related bottlenecks. Critical and High findings are gate blockers — they route through the Stage 4 pushback loop, framed as insight/implication. The SWE responds with an architecture change or a defended rationale. Performance findings that surface product tradeoffs (e.g., "streaming responses requires a different UI pattern than the PRD describes") are routed through product-agent like any other product-facing pushback item. Do not let the SWE silently resolve cost-quality tradeoffs.
+
+**Post-Build (Stage 9.5, parallel with security code review):** After all tasks in a milestone pass their gates and before the smoke test, spin up performance-agent with the source code, XRD, and dependency manifests. The performance agent reviews the implementation for critical-path blocking calls, render-path inefficiency, query patterns, concurrency issues, and asset/bundle size. Critical and High findings block the smoke test — each becomes a fix task that runs through Stage 9 before proceeding. Medium findings are logged and become tasks in the current or next milestone.
+
+Read `prompts/performance-agent.md` for the full performance review protocol.
+
+#### Design Reviews
+
+Design-agent is the reactive specialist. It does not run on greenfield first milestones — there is nothing for it to react to. It runs in two situations:
+
+**Audit + Redesign (human-invoked design-pass milestone):** The human says "run a design pass on [project]." Create a new milestone directory (`m<next>-<project>-design-pass/`), screenshot the running product via Playwright, and spin up design-agent as the entry-point agent for that milestone. Design-agent leads; product-agent and swe-agent follow. The agent produces `design-tokens.md` at the project root, prototype files in the milestone directory, an audit report, and a list of Tier 3 decisions (routed through product-agent per the relay protocol). The SWE then decomposes the design-pass work into fix-list tasks. If the fix list exceeds the 30-task scaling signal, sub-decompose into additional design milestones — this avoids a Big Bang visual redesign. See `design-pass-starter.md` for the full invocation protocol.
+
+**Enforcement (Stage 10 of UI milestones):** When `design-tokens.md` exists at the project root and the milestone touched UI, spin up design-agent after the functional smoke test passes. The agent reads computed styles from the running product via Playwright's `browser_evaluate` (not screenshots — JPEG compression and subpixel rendering make screenshot-based hex comparison unreliable) and compares against the token file. Regressions and specification misses become fix tasks. Token file extensions for unspecified surfaces are Tier 2.
+
+**Detect sub-mode (Stage 10 of UI milestones without a token file):** When no token file exists yet, enforcement mode runs in detect mode instead. The agent counts hardcoded visual values in the milestone's diff, new surfaces the milestone introduced, smoke-test cosmetic fixes, and task-agent invention notes. It emits a debt score. If the score exceeds the threshold (default 15), write a Tier 3 recommendation to `OPEN-ITEMS.md` proposing a design pass as the next milestone. The recommendation is advisory, not a gate — the human decides whether to accept it.
+
+The design-agent instance of the Tier 3 → Tier 2 ratchet is the whole point of the token file. Every hex value in the file was once a Tier 3 decision. Once the human approves the file, every subsequent use of those values is Tier 1 (the code is the log). Later milestones stop asking "what color should this be" because the file has the answer. This is the System Maturity model from `CLAUDE.md` applied to visual decisions: early milestones churn Tier 3; later milestones run fast because the values are settled.
+
+Read `prompts/design-agent.md` for the full design review protocol.
 
 ### The Smoke Test (Stage 10)
 
@@ -231,9 +290,16 @@ Read `prompts/smoke-test-protocol.md` for the full smoke test protocol.
 5. Produce a smoke test report (see `prompts/smoke-test-protocol.md` for format).
 
 **Gate:**
-- All steps PASS: milestone complete. Advance to the next milestone or complete the pipeline.
+- All steps PASS: advance to visual enforcement (below) if this is a UI milestone. Otherwise milestone complete — advance to the next milestone or complete the pipeline.
 - Any step FAIL: each failed step becomes a fix task (following the task template). Run fix tasks through Stage 9, then rerun Stage 10. The milestone is not complete until all steps pass.
 - Any step BLOCKED: report what's blocked and why. The human resolves the blocker. Stage 10 reruns.
+
+**Visual enforcement (UI milestones only):** After the functional smoke test passes, spin up design-agent in enforcement mode against the same running product. Which sub-mode runs depends on project state:
+
+- **Audit sub-mode** — `design-tokens.md` exists at the project root. Design-agent compares computed styles from the running product against the token file and against prior prototypes. Regressions and specification misses become fix tasks that run through Stage 9. The milestone's visual layer is not complete until all visual audit findings are resolved.
+- **Detect sub-mode** — No token file exists yet. Design-agent counts hardcoded visual values, new surfaces, smoke-test cosmetic fixes, and task-agent invention notes. It emits a debt score. If the score exceeds threshold, it writes a Tier 3 recommendation to `OPEN-ITEMS.md` proposing a design pass as the next milestone. The recommendation is advisory — the human decides. The milestone completes regardless.
+
+The orchestrator picks the sub-mode based on the presence of `design-tokens.md`, not based on milestone type.
 
 ### The Stress Test (Stage 11)
 
@@ -350,6 +416,7 @@ These are the modes that manifest at your level — across agents, across stages
 | Decision Collision | During parallel builds, verify DECISIONS.md was not written to by multiple agents in the same wave. If collision detected, deduplicate by reading task Completed sections as the source of truth and rewriting the affected range. |
 | Big Bang Integration | A brief with multiple milestones is being built in a single pass without per-milestone smoke tests. If the brief decomposed into 3+ milestones and you're building them all before smoke testing any, stop. Run the pipeline per milestone. |
 | Accumulating Fragility | The SDM flags that continuing the milestone is creating maintenance complexity or cascading bug risk faster than it's creating value. When the SDM's refactoring assessment triggers, halt the build and surface to the human. Do not continue building on a foundation the SDM has flagged as structurally unsound. |
+| Token Drift | UI tasks ship with hardcoded visual values instead of references to `design-tokens.md`. Five surfaces ship with five slightly different grays. For UI milestones where the token file exists, verify task-agent completions against the file — any new hex value in a diff that isn't defined in the token file is a scope violation in the same way that files-outside-scope modifications are. Design-agent's Stage 10 enforcement mode catches what slips through; prefer to catch it earlier. |
 
 ## SDM Trigger Rules
 
