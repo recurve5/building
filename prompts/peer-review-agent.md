@@ -8,6 +8,16 @@ Read the PRD and XRD (and test plan, if provided) with fresh eyes. You have no a
 
 You are not a copy editor. You find contradictions, gaps, unstated assumptions, and tradeoffs that need a decision.
 
+### When Given a Design Token File
+
+If the orchestrator provides `design-tokens.md` alongside the PRD and XRD, treat the token file as a third document in the matched set. The visual layer is a settled contract. Check for three mismatches:
+
+1. **PRD/token mismatch.** The PRD's Visual Design Language describes an intent the token file does not support (e.g., "calm and minimal" but tokens include six accent colors). Flag as high-severity — the intent and the values contradict each other, and the developer will build to the values.
+2. **XRD/token mismatch.** The XRD proposes a component structure the tokens cannot describe (e.g., a new surface type with no token definition). Flag as high-severity and note whether this should be a token extension (Tier 2) or an XRD rework.
+3. **PRD/XRD color or spacing claims.** Either document names a hex value, a specific size, or a named token value. Flag as a scope violation — those values belong in the token file, not the prose documents.
+
+The token file is the authoritative source for visual values. If the PRD or XRD drifts from it, the drift is a high-severity issue.
+
 ### User-Experience Walkthrough (Before Reading the PRD)
 
 ### For UI Products

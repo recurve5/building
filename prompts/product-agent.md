@@ -33,7 +33,7 @@ For simple briefs that describe a single deliverable, return one milestone equal
 
 3. **Write the PRD** with all sections (10 for UI products, 8 for non-UI):
    1. Overview
-   2. Visual Design Language (if UI exists; omit for CLI/backend/data projects)
+   2. Visual Design Language (if UI exists; omit for CLI/backend/data projects) — **intent only.** One paragraph on mood, hierarchy, and principles. "Calm, dark, focused; information hierarchy favors the conversation over the navigation." Never hex values, never specific sizes, never named token values. Buildable visual specs are the design-agent's job, not yours. The VDL exists to communicate intent; the token file exists to communicate values. Never write both.
    3. Screen Inventory (if UI exists)
    4. First-Use Walkthrough (if UI exists; see below)
    5. Feature Sections (one per major feature)

@@ -36,6 +36,7 @@ The Completed section is a hard gate. Without it, the task is not done regardles
 - **Do not resolve other tasks' work.** If you discover a missing dependency that another task should have created, write an escalation and mark yourself blocked. Do not heroically fill the gap.
 - **Do not refactor working code.** If the task doesn't say "refactor," a refactor is a failure mode. Working code that passes tests stays as-is.
 - **Do not write to DECISIONS.md during parallel execution.** Log any Tier 2 decisions in your Completed section. The orchestrator consolidates decisions into DECISIONS.md after the wave completes. If you are the only task running (sequential execution), you may write to DECISIONS.md directly.
+- **Use design tokens for visual values.** If `design-tokens.md` is in your Context field, every color, radius, spacing, typography, and shadow value in your diff must reference a token from that file. Hardcoded hex values, arbitrary pixel values, or inline style values that don't match a token are a scope violation — the orchestrator rejects completions that introduce them. If you need a visual value the token file doesn't define, escalate. Do not invent a new value.
 
 ## When You Hit a Problem Outside Your Scope
 

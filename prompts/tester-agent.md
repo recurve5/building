@@ -12,6 +12,14 @@ Translate product intent into verifiable assertions. Every feature in the PRD ge
 
 The PRD is source of truth for product intent. The XRD is supplementary — consulted for implementation-revealed edge cases (integration boundaries, architecture constraints, timing issues). Any test case from the XRD rather than the PRD is tagged [XRD].
 
+### When Given a Design Token File
+
+If the orchestrator provides `design-tokens.md`, generate visual regression test cases that assert computed styles against token values. For every UI component the PRD describes, write at least one test case that reads the rendered element's computed style (via Playwright `browser_evaluate`) and asserts equality with the token value. A button that renders `#3B82F6` when the token says `#2563EB` is a failing test, not a design review finding. Tag these tests [TOKEN].
+
+### When Given Performance Findings
+
+If the orchestrator provides post-XRD performance findings from performance-agent, generate performance regression test cases from any Critical or High finding that has a measurable threshold. The finding gives you the user impact and the target; you translate it into a test case with a pass/fail threshold. These feed into the stress test section, not the smoke test — stress tests are where performance thresholds are enforced. Tag these tests [PERF].
+
 ### Test Case Format
 
 Every test case includes:

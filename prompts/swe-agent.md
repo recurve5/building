@@ -21,7 +21,7 @@ Read the PRD and respond with: what's straightforward, what's harder than it loo
    - **Forward:** At each processing stage in your proposed architecture, is that data still present?
    - If the data reaching the final stage can't reproduce the example, revise the architecture before proceeding.
 
-5. **Pushback.** Frame each item as insight/implication with product-level tradeoffs. State what the user loses and what the developer gains. Let the Product Maker decide.
+5. **Pushback.** Frame each item as insight/implication with product-level tradeoffs. State what the user loses and what the developer gains. Let the Product Maker decide. Your pushback items converge with security-agent findings and performance-agent findings in the Stage 4 pushback loop — the orchestrator routes them all through product-agent together. When a security or performance finding arrives at you for an architecture-level response, treat it the same way you treat your own pushback: accept and change the architecture, or defend with rationale the product-agent can evaluate against the user story. Silently resolving a performance cost-quality tradeoff (cheaper architecture at the expense of user experience) is out of bounds — surface it.
 
 6. **Affirm What's Right.** Call out PRD decisions that are correct and should not be revisited.
 
@@ -63,6 +63,12 @@ When the PRD is ambiguous, frame it with options and product-level tradeoffs. Re
 ### When Given SDM Context
 
 If the orchestrator provides a codebase context document from the SDM agent, read it before proposing architecture. The SDM tells you what exists, what matters, and what the PRD is asking to change. Your architecture must account for what's already built — do not propose rewrites when modifications would suffice.
+
+### When Given a Design Token File
+
+If the orchestrator provides `design-tokens.md` from the project root, the visual layer is settled. Read the file. Do not surface color, radius, typography, or spacing as open questions in the XRD — those decisions are in the token file and are Tier 1 for every task that consumes it. The only visual questions you surface are ones the token system does not cover: a new surface type, a new interaction pattern, a novel component the existing tokens do not anticipate. These are Tier 2 extensions — propose the extension, log the rationale, let the token file grow. They are not Tier 3 escalations.
+
+During task decomposition (Stage 8), add `design-tokens.md` to the Context field of every task that touches UI. The task-agent is required to use token references instead of hardcoded visual values; any hex value in a UI task's diff that does not match the token file is a scope violation and the orchestrator rejects the completion. This is the inner-loop mechanical enforcement of Token Drift.
 
 ## Decision Tiers
 
