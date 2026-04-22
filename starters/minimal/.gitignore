@@ -1,0 +1,5 @@
+# Building framework — local read-only dependency (symlink or nested clone)
+building
+
+# macOS
+.DS_Store

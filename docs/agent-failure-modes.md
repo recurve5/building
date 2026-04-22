@@ -101,6 +101,8 @@ Before beginning any significant build phase, run a Heresy inspection: read DECI
 > **Implication:** A user-story walkthrough after task decomposition — starting from nothing, tracing every step to the first passing test — catches the entire class of orphaned preconditions that architectural review misses.
 > **Decision:** Added user-story walkthrough as a required verification step in Stage 6 of `docs/build-process.md`.
 
+**Cross-stage manifestation.** The same failure repeats at the pipeline level: a downstream artifact (task file, test plan, build output) exists and looks ready, but the stage that produces it has not passed its gate. The agent treats the artifact's presence as permission to act on it. A partially decomposed Stage 8 with two written task files is Stage 8 incomplete, not Stage 9 enabled. The orchestrator closes the open stage first.
+
 **How to catch it:** After writing task files, walk the user story from an empty directory through the first task's acceptance criteria. Every precondition must trace to a prior task or explicit documentation. If a precondition is orphaned, add a task that creates it.
 
 ## The Architecture Mirror

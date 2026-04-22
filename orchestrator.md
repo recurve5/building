@@ -346,6 +346,7 @@ These are the modes that manifest at your level — across agents, across stages
 | Heresy | Before Stage 9 (Build), scan for any Hard Kill terminology in all project files. Block until clean. |
 | Architecture Mirror | During XRD review, check: do the component names map to output headings? If yes, flag for the SWE to verify they're architecting the creation process, not the output structure. |
 | Heroic Unblock | During Build, if a task-agent modifies files outside its scope, reject the completion. Mark the task blocked. Do not let it resolve another task's work. |
+| Precondition Ghost | Before advancing to the next stage, verify the current stage's gate per the Pipeline table. Partial decomposition, half-written task files, or a pending mandatory review means the current stage is incomplete — not the next stage enabled. A single ready-looking downstream artifact is not permission to execute it. |
 | Confidence Bluff | Never accept "tests pass" without test output. Run the suite or require the agent to show the output. |
 | Decision Collision | During parallel builds, verify DECISIONS.md was not written to by multiple agents in the same wave. If collision detected, deduplicate by reading task Completed sections as the source of truth and rewriting the affected range. |
 | Big Bang Integration | A brief with multiple milestones is being built in a single pass without per-milestone smoke tests. If the brief decomposed into 3+ milestones and you're building them all before smoke testing any, stop. Run the pipeline per milestone. |
