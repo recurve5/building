@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 
 // ---------------------------------------------------------------------------
@@ -112,6 +112,11 @@ function classifyResponse(content: string): 'warning' | 'info' {
 const cleanSlateBias: Check = {
   name: 'clean-slate-bias',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    const candidates = findCandidatePairs(context);
+    return { check: 'clean-slate-bias', count: candidates.length, candidates };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     const candidates = findCandidatePairs(context);

@@ -77,6 +77,23 @@ export interface Check {
   name: string;
   layer: 1 | 2;
   run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult>;
+  /**
+   * Layer 2 only. Emit the candidate set this check would have sent to the LLM,
+   * without calling the LLM. Used by `--dump-candidates` so external drivers
+   * (e.g. Claude Code skills) can apply judgment without API spend.
+   */
+  dumpCandidates?(context: ProjectContext): CandidateDump;
+}
+
+export interface CandidateDump {
+  /** Check name, for sanity-checking the file. */
+  check: string;
+  /** Candidate count. Zero is valid (means "no judgment work to do"). */
+  count: number;
+  /** Per-check candidate shape. Each check defines its own structure. */
+  candidates: unknown[];
+  /** Optional context the judge needs (e.g. metrics for refactoring-signals). */
+  context?: Record<string, unknown>;
 }
 
 // Section 4: AnalyzedFile

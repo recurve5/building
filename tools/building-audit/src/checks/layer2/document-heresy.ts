@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 import { extractTerms, isDecisionsFile } from '../heresy-shared.js';
 
@@ -69,9 +69,52 @@ interface CandidateMatch {
 
 const TERM_MATCH_THRESHOLD = 3;
 
+interface DocumentHeresyCandidate {
+  decisionNumber: number;
+  decisionText: string;
+  rationale: string;
+  filePath: string;
+  content: string;
+  matchedTermCount: number;
+}
+
+function findDocumentHeresyCandidates(context: ProjectContext): DocumentHeresyCandidate[] {
+  const { decisions, rawFiles } = context;
+  const hardKills = decisions.filter((d) => d.tags.includes('HARD KILL'));
+  const out: DocumentHeresyCandidate[] = [];
+
+  for (const kill of hardKills) {
+    const terms = extractTerms(`${kill.decision} ${kill.rationale}`);
+    if (terms.length === 0) continue;
+
+    for (const [filePath, content] of rawFiles) {
+      if (isDecisionsFile(filePath)) continue;
+      if (!isMarkdownFile(filePath)) continue;
+      const matchCount = countTermMatches(content, terms);
+      if (matchCount >= TERM_MATCH_THRESHOLD) {
+        out.push({
+          decisionNumber: kill.number,
+          decisionText: kill.decision,
+          rationale: kill.rationale,
+          filePath,
+          content,
+          matchedTermCount: matchCount,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
 const documentHeresy: Check = {
   name: 'document-heresy',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    const candidates = findDocumentHeresyCandidates(context);
+    return { check: 'document-heresy', count: candidates.length, candidates };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     const { decisions, rawFiles } = context;

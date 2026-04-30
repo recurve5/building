@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 
 // ---------------------------------------------------------------------------
@@ -76,6 +76,11 @@ function parseVerdict(response: string): Verdict {
 export const ghostRefactorCheck: Check = {
   name: 'ghost-refactor',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    const candidates = findCandidates(context);
+    return { check: 'ghost-refactor', count: candidates.length, candidates };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     if (!llmClient) {

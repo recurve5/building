@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 
 // ---------------------------------------------------------------------------
@@ -161,6 +161,14 @@ function isAcceptable(response: string): boolean {
 export const reactFluidityCheck: Check = {
   name: 'react-fluidity',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    if (!isReactProject(context)) {
+      return { check: 'react-fluidity', count: 0, candidates: [], context: { reason: 'not-a-react-project' } };
+    }
+    const candidates = findCandidates(context);
+    return { check: 'react-fluidity', count: candidates.length, candidates };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     // React detection gate

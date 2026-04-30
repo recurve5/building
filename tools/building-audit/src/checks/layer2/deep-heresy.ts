@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 
 // ---------------------------------------------------------------------------
@@ -95,9 +95,67 @@ function parseLLMResponse(content: string): 'critical' | 'warning' | null {
   return null;
 }
 
+interface DeepHeresyCandidate {
+  decisionNumber: number;
+  decisionText: string;
+  rationale: string;
+  filePath: string;
+  content: string;
+  matchedKeywordCount: number;
+}
+
+function findDeepHeresyCandidates(context: ProjectContext): DeepHeresyCandidate[] {
+  const { decisions, sourceFiles, rawFiles } = context;
+  const hardKills = decisions.filter((d) => d.tags.includes('HARD KILL'));
+  const out: DeepHeresyCandidate[] = [];
+
+  for (const kill of hardKills) {
+    const keywords = extractKeywords(`${kill.decision} ${kill.rationale}`);
+    if (keywords.length === 0) continue;
+
+    for (const [filePath, analyzed] of sourceFiles) {
+      const identifierText = analyzed.identifiers.join(' ');
+      const matchCount = countKeywordMatches(keywords, identifierText);
+      if (matchCount >= KEYWORD_CLUSTER_THRESHOLD) {
+        const content = rawFiles.get(filePath) ?? identifierText;
+        out.push({
+          decisionNumber: kill.number,
+          decisionText: kill.decision,
+          rationale: kill.rationale,
+          filePath,
+          content,
+          matchedKeywordCount: matchCount,
+        });
+      }
+    }
+
+    for (const [filePath, content] of rawFiles) {
+      if (sourceFiles.has(filePath)) continue;
+      const matchCount = countKeywordMatches(keywords, content);
+      if (matchCount >= KEYWORD_CLUSTER_THRESHOLD) {
+        out.push({
+          decisionNumber: kill.number,
+          decisionText: kill.decision,
+          rationale: kill.rationale,
+          filePath,
+          content,
+          matchedKeywordCount: matchCount,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
 const deepHeresy: Check = {
   name: 'deep-heresy',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    const candidates = findDeepHeresyCandidates(context);
+    return { check: 'deep-heresy', count: candidates.length, candidates };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     const { decisions, sourceFiles, rawFiles } = context;

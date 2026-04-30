@@ -1,4 +1,4 @@
-import type { Check, CheckResult, Finding, ProjectContext, LLMClient } from '../types.js';
+import type { Check, CheckResult, Finding, ProjectContext, LLMClient, CandidateDump } from '../types.js';
 import { registerCheck } from '../registry.js';
 
 // ---------------------------------------------------------------------------
@@ -162,6 +162,18 @@ function buildPrompt(metrics: RefactoringMetrics): string {
 const refactoringSignals: Check = {
   name: 'refactoring-signals',
   layer: 2,
+
+  dumpCandidates(context: ProjectContext): CandidateDump {
+    // refactoring-signals is holistic — the "candidate" is the metric set
+    // itself. The judge reads the metrics and produces a green/yellow/red
+    // assessment.
+    const metrics = computeMetrics(context);
+    return {
+      check: 'refactoring-signals',
+      count: 1,
+      candidates: [metrics],
+    };
+  },
 
   async run(context: ProjectContext, llmClient?: LLMClient): Promise<CheckResult> {
     if (!llmClient) {

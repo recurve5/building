@@ -4,6 +4,7 @@
 export type {
   Check,
   CheckResult,
+  CandidateDump,
   Finding,
   SecretLocation,
   ProjectContext,
