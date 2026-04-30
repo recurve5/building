@@ -1,0 +1,31 @@
+{
+  "name": "building-audit",
+  "version": "1.0.0",
+  "description": "Build system audit tool for multi-agent orchestration projects",
+  "type": "module",
+  "bin": {
+    "building-audit": "./dist/bin/building-audit.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.88.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/typescript-estree": "^8.0.0",
+    "commander": "^12.1.0",
+    "remark-parse": "^11.0.0",
+    "simple-git": ">=3.16.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

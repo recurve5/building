@@ -1,2 +1,5 @@
 .DS_Store
 .claude/
+tools/building-audit/node_modules/
+tools/building-audit/dist/
+tools/building-audit/coverage/

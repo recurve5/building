@@ -20,6 +20,8 @@ Produce working, tested code that meets the task's acceptance criteria. Then wri
 
 3. **Build.** Write the code. Follow existing patterns and conventions in the codebase. Extend what exists rather than creating new components.
 
+   **Before writing any new top-level function, class, or utility:** grep the existing source for that name (`rg -nE "^(export )?(async )?function <name>" src/` and the equivalent for classes). If a definition already exists in another file, either import and extend it, or stop and escalate as a Tier 2 decision. Writing a fresh implementation when one exists is Clean Slate Bias and is treated as a scope violation, not a stylistic choice.
+
 4. **Test.** Write the tests specified in the task file. Run them. Run the full test suite. All tests must pass — not self-reported, actually pass.
 
 5. **Write the Completed section:**
@@ -31,6 +33,7 @@ The Completed section is a hard gate. Without it, the task is not done regardles
 
 ## Scope Rules
 
+- **Commit convention:** Prefix every commit message with `[TASK_ID]` where TASK_ID is your numeric task number (e.g., `[003] implement StreakService`). A commit without this prefix is itself a finding under Scope Creep.
 - **Only modify files in the task's Files section.** Any file not listed is out of scope. If you discover you need to modify an unlisted file, write an escalation note and stop that part of the work.
 - **Only use contracts from DAY-ZERO.md.** If you need an interface that isn't there, escalate. Do not invent one.
 - **Do not resolve other tasks' work.** If you discover a missing dependency that another task should have created, write an escalation and mark yourself blocked. Do not heroically fill the gap.
@@ -51,11 +54,11 @@ Do not pull in additional files to resolve it yourself.
 
 Before reporting done, verify:
 
-- **Test Cheat:** Are your assertions testing correctness, not just existence? `assertEqual(result, expected)` not `assertNotNil(result)`.
+- **Test Cheat:** Are your assertions testing correctness, not just existence? `assertEqual(result, expected)` not `assertNotNil(result)`. For collections, length alone is not enough — pair every `toHaveLength` with a content check on at least one element (`expect(items[0]).toMatchObject({...})`). A wrong implementation that returns the right *number* of wrong items must fail your test.
 - **Scope Creep:** Did you modify any files not in the Files section? Did you change unrelated parts of listed files?
 - **Dependency Grab:** Did you add any imports or packages not in the task's contracts? If yes, justify.
 - **Loop of Despair:** Have you tried the same fix more than 3 times? If yes, stop. Revert to last working state. Escalate with what you've tried and what's failing.
-- **Clean Slate Bias:** Did you write a new utility that duplicates an existing one? Search the codebase first.
+- **Clean Slate Bias:** Did you write a new top-level function/class/utility without first grepping the codebase for that name? If a function with the same name already exists in another file, you must either import it or escalate — not write a parallel copy. This is the most common failure mode caused by scoped task context, so the check is mandatory, not optional.
 - **Premature Abstraction:** Did you build a protocol/factory/registry/base class not in the task spec? Does it serve a concrete, near-term need?
 
 ## Output Contract

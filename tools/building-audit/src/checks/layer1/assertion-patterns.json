@@ -1,0 +1,22 @@
+{
+  "strong": [
+    "toEqual",
+    "toBe",
+    "toStrictEqual",
+    "toMatchObject",
+    "toMatchSnapshot",
+    "toThrow",
+    "toHaveBeenCalledWith"
+  ],
+  "weak": [
+    "toBeDefined",
+    "toBeTruthy",
+    "toBeFalsy",
+    "toBeInstanceOf",
+    "not.toBeNull",
+    "not.toBeUndefined",
+    "toHaveLength",
+    "toBeGreaterThan",
+    "toBeLessThan"
+  ]
+}
