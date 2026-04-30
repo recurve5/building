@@ -101,6 +101,36 @@ See `docs/agent-failure-modes.md` for the full catalog.
 
 ---
 
+## Tools
+
+The framework lists failure modes. The tools catch them.
+
+### building-audit
+
+A CLI that audits a finished milestone for the failure modes the framework names. It runs in two layers:
+
+- **Mechanical (Layer 1)** — deterministic static analysis. AST parsing, git history, regex patterns. No model calls. Fast and free. Covers Test Cheat, Scope Creep, Dependency Grab, Premature Abstraction, Surface Heresy, Confidence Bluff, Accumulating Fragility, Resource Drain, Unoptimized Defaults.
+- **Judgment (Layer 2)** — LLM-based, run only when the mechanical layer's not enough. Covers Ghost Refactor, Clean Slate Bias, Deep Heresy, Document Heresy, Performance Critical Path, React Fluidity, Refactoring Signals.
+
+Mechanical mode runs after every task. Full mode runs at milestone close. Critical findings block the gate; the agent that produced the work does not evaluate the work.
+
+```sh
+cd ~/building/tools/building-audit && npm install && npm run build && npm link
+cd ~/your-project
+building-audit --mechanical              # cheap per-task gate
+building-audit --full                    # milestone-close audit (needs ANTHROPIC_API_KEY)
+```
+
+13 of 19 failure modes are covered today. The remaining 6 are process or design failures with no artifact evidence — those stay in the catalog as human-review items.
+
+See `tools/building-audit/` for source, `milestones/building-audit/` for PRD, XRD, peer review, security review, and decisions log.
+
+### building-orchestrator (next)
+
+The follow-on milestone. A code-based build harness — `building-run` — that mechanically enforces the pipeline. Markdown rules can be silently dropped under context pressure; code can't. Brief in `milestones/building-orchestrator/`. Depends on building-audit.
+
+---
+
 ## How to use it
 
 ### New project
@@ -150,6 +180,11 @@ Between those points, the pipeline runs autonomously.
     automation.md                # Gate Runner and automation layer.
     build-process.md             # Human-readable pipeline reference.
     roadmap.md                   # Open design questions.
+  tools/
+    building-audit/              # The audit CLI (M1, shipped).
+  milestones/
+    building-audit/              # M1 PRD, XRD, peer review, decisions.
+    building-orchestrator/       # M2 brief.
 ```
 
 Each project organizes its work into milestone directories:
