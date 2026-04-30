@@ -119,7 +119,7 @@ See `docs/agent-failure-modes.md` for the full catalog. Modes are assigned to th
 
 **Inner loop (task-agent):** Test Cheat, Loop of Despair, Scope Creep, Ghost Refactor, Clean Slate Bias, Dependency Grab.
 
-**Middle loop (orchestrator + sdm-agent):** Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.
+**Middle loop (orchestrator + sdm-agent):** Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock, Process Drift.
 
 **Outer loop (sdm-agent):** Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.
 

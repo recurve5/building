@@ -8,7 +8,7 @@ Failure modes cluster by development loop timescale (per Yegge/Kim's three-loop 
 
 **Inner loop** (during task execution, seconds to minutes) — These happen while the agent is writing code. Detection during execution is cheaper than detection at the gate: **Test Cheat, Loop of Despair, Scope Creep, Ghost Refactor, Clean Slate Bias, Dependency Grab.**
 
-**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock.**
+**Middle loop** (across tasks and sessions, hours to days) — These emerge from the boundaries between tasks or the gaps between sessions: **Context Amnesia, Heresy, Precondition Ghost, Closed-Loop Build, Confidence Bluff, Heroic Unblock, Process Drift.**
 
 **Outer loop** (architectural, weeks to months) — These are baked into the design before code is written. They're the most expensive to fix because every task built on a flawed architecture inherits the flaw: **Architecture Mirror, Lossy Middleman, Premature Abstraction, Unoptimized Default, Spec Without Shoes, Big Bang Integration, Accumulating Fragility.**
 
@@ -202,3 +202,13 @@ Ask: "Am I designing this system to mirror what the output looks like, or to mir
 **The signature:** Completed sections across recent tasks share a theme — different tasks flagging the same structural concern from different angles. Bug fixes in one area routinely break something in another. Test setup requires increasingly elaborate mocking or state management. New code takes longer to write not because the feature is complex, but because understanding the existing code is complex. Agents (or developers) spend more time reading than writing.
 
 **How to catch it:** The SDM runs a refactoring assessment at every trigger point (mid-build synthesis, post-milestone reassessment, task escalation routing). Two specific conditions trigger a milestone halt: (1) maintenance complexity accumulation — the cost of adding the next feature exceeds the cost of restructuring, and (2) cascading bug risk — fixing one bug has a high probability of creating a new bug. When either condition is met, the SDM halts the milestone and surfaces the assessment to the human as a Tier 3 decision. See `prompts/sdm-agent.md` for the full assessment protocol and signal list.
+
+## Process Drift
+
+**What it is:** The agent reads the build instructions — branch strategy, commit conventions, phase gates, verification steps — confirms understanding, and then silently deviates from the process while still producing correct output. The product works. The process wasn't followed. The value the process was designed to provide (rollback points, auditability, phase isolation) is gone.
+
+**Why it happens:** The agent's objective function points at the output, not the process. Tests pass. The smoke test passes. The code works. The agent has no internal mechanism that distinguishes "I produced correct code" from "I followed the build plan." When context windows fill and sessions restart, the process instructions are the first thing that loses salience — the agent remembers what to build but forgets how it was told to build it.
+
+**The signature:** The starter prompt specifies branches, commit conventions, or phase-gated verification. The working tree has all changes uncommitted, or committed to a single branch, or committed without the specified message convention. The agent reports completion with full confidence because the product-level checks passed. The process-level checks were never run — by the agent or by any gate.
+
+**How to catch it:** Verify git state against the build plan at every phase boundary. Do the branches exist? Do they have commits? Do the commit messages follow the convention? Did the agent actually stop and run verification between phases, or did it blast through all phases in a single session? These are mechanical checks — no judgment required. The build plan specifies the expected state. Git reports the actual state. Compare them.
