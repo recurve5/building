@@ -74,20 +74,35 @@ export async function runChecks(
     secretLocations = extractSecretLocations(resourceDrainResult);
   }
 
+  // Wire secret locations to the LLM client before Layer 2 runs (SCR-7).
+  if (llmClient && 'setSecretLocations' in llmClient && typeof (llmClient as any).setSecretLocations === 'function') {
+    (llmClient as any).setSecretLocations(secretLocations);
+  }
+
   // --- Layer 2 --------------------------------------------------------
   const layer2 = getChecks(2);
 
   if (mode === 'mechanical') {
-    // Skip all Layer 2 checks in mechanical mode.
+    // In mechanical mode, most Layer 2 checks are skipped — but checks
+    // with a useful candidate-finding phase that doesn't require LLM
+    // judgment can still run. clean-slate-bias is the per-task gate
+    // for name collisions; it runs without an LLM client and emits
+    // info-severity findings.
+    const mechanicalLayer2 = new Set(['clean-slate-bias']);
     for (const check of layer2) {
-      results.push({
-        name: check.name,
-        layer: 2,
-        status: 'skipped',
-        severity: 'clean',
-        findings: [],
-        errorMessage: null,
-      });
+      if (mechanicalLayer2.has(check.name)) {
+        const result = await executeCheck(check, context, undefined);
+        results.push(result);
+      } else {
+        results.push({
+          name: check.name,
+          layer: 2,
+          status: 'skipped',
+          severity: 'clean',
+          findings: [],
+          errorMessage: null,
+        });
+      }
     }
   } else {
     // Full mode — run Layer 2 sequentially.

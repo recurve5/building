@@ -6,6 +6,9 @@ import type {
   SecretLocation,
   TopFinding,
 } from '../types/index.js';
+import { redactSecrets } from '../llm/redact.js';
+
+export { redactSecrets };
 
 const REPORT_VERSION = '1.0.0';
 
@@ -15,38 +18,6 @@ const SEVERITY_ORDER: Record<string, number> = {
   info: 2,
   clean: 3,
 };
-
-/**
- * Mask a secret value: first 4 chars + '...' + last 4 chars.
- * If the value is too short, mask entirely.
- */
-function maskValue(value: string): string {
-  if (value.length <= 8) {
-    return '[REDACTED]';
-  }
-  return value.slice(0, 4) + '...' + value.slice(-4);
-}
-
-/**
- * Replace secret values in a string with [REDACTED:pattern-type].
- */
-export function redactSecrets(text: string, secrets: SecretLocation[]): string {
-  let result = text;
-  for (const secret of secrets) {
-    // Reconstruct the original value from the masked version for matching.
-    // maskedValue is "first4...last4" -- we can't reconstruct the full value.
-    // Instead, search for the maskedValue pattern itself in evidence fields,
-    // and also do a regex scan for common secret patterns as defense-in-depth.
-    if (secret.maskedValue) {
-      result = result.replaceAll(secret.maskedValue, `[REDACTED:${secret.patternType}]`);
-    }
-  }
-  // Defense-in-depth: catch common secret patterns
-  result = result.replace(/(?:AKIA[0-9A-Z]{16})/g, '[REDACTED:aws-key]');
-  result = result.replace(/(?:ghp_[A-Za-z0-9]{36})/g, '[REDACTED:github-token]');
-  result = result.replace(/(?:sk-[A-Za-z0-9]{48})/g, '[REDACTED:api-key]');
-  return result;
-}
 
 /**
  * Apply secret masking to a single finding's description and evidence fields.

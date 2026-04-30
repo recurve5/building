@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createProgram } from '../src/cli/index.js';
 
-function runCli(args: string[]): { exitCode: number | null; stdout: string; stderr: string } {
+async function runCli(args: string[]): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
   let exitCode: number | null = null;
   let stdout = '';
   let stderr = '';
@@ -37,7 +37,7 @@ function runCli(args: string[]): { exitCode: number | null; stdout: string; stde
       writeOut: (str: string) => { stdout += str; },
       writeErr: (str: string) => { stderr += str; },
     });
-    program.parse(['node', 'building-audit', ...args]);
+    await program.parseAsync(['node', 'building-audit', ...args]);
   } catch (e: unknown) {
     const err = e as Error & { exitCode?: number };
     if (err.message?.startsWith('EXIT_')) {
@@ -57,30 +57,30 @@ function runCli(args: string[]): { exitCode: number | null; stdout: string; stde
 
 describe('CLI', () => {
   // CLI-003: Neither --mechanical nor --full
-  it('prints usage and exits 2 when no mode flag provided', () => {
-    const result = runCli([]);
+  it('prints usage and exits 2 when no mode flag provided', async () => {
+    const result = await runCli([]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('--mechanical');
     expect(result.stderr).toContain('--full');
   });
 
   // CLI-004: Both --mechanical and --full
-  it('exits 2 when both --mechanical and --full provided', () => {
-    const result = runCli(['--mechanical', '--full']);
+  it('exits 2 when both --mechanical and --full provided', async () => {
+    const result = await runCli(['--mechanical', '--full']);
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain('mutually exclusive');
   });
 
   // CLI-009: --version prints version and exits
-  it('prints version and exits with code 0', () => {
-    const result = runCli(['--version']);
+  it('prints version and exits with code 0', async () => {
+    const result = await runCli(['--version']);
     expect(result.stdout).toContain('building-audit v1.0.0');
     expect(result.exitCode).toBe(0);
   });
 
   // CLI-010: --help prints usage and exits
-  it('prints help and exits with code 0', () => {
-    const result = runCli(['--help']);
+  it('prints help and exits with code 0', async () => {
+    const result = await runCli(['--help']);
     expect(result.stdout).toContain('--mechanical');
     expect(result.stdout).toContain('--full');
     expect(result.stdout).toContain('--milestone');
