@@ -1,5 +1,6 @@
 import type { Check, CheckResult, Finding, ProjectContext } from '../types.js';
 import { registerCheck } from '../registry.js';
+import { extractTerms, isDecisionsFile } from '../heresy-shared.js';
 
 // ---------------------------------------------------------------------------
 // Surface Heresy Check
@@ -7,53 +8,6 @@ import { registerCheck } from '../registry.js';
 // Parses DECISIONS.md for [HARD KILL] entries, extracts killed terminology,
 // and searches the codebase for references to killed concepts.
 // Source code matches = critical, documentation matches = warning.
-
-/**
- * Extract searchable terms from a Hard Kill decision text.
- * Extracts: backtick-wrapped identifiers, quoted strings, and PascalCase/camelCase words.
- */
-function extractTerms(decisionText: string): string[] {
-  const terms: string[] = [];
-  const seen = new Set<string>();
-
-  const add = (term: string) => {
-    const trimmed = term.trim();
-    // Skip very short terms (likely noise) and common stop words.
-    if (trimmed.length < 3) return;
-    if (seen.has(trimmed.toLowerCase())) return;
-    seen.add(trimmed.toLowerCase());
-    terms.push(trimmed);
-  };
-
-  // Backtick-wrapped identifiers
-  const backtickMatches = decisionText.matchAll(/`([^`]+)`/g);
-  for (const m of backtickMatches) {
-    add(m[1]);
-  }
-
-  // Quoted strings (single and double)
-  const quoteMatches = decisionText.matchAll(/["']([^"']+)["']/g);
-  for (const m of quoteMatches) {
-    add(m[1]);
-  }
-
-  // PascalCase and camelCase identifiers (at least two segments)
-  const identMatches = decisionText.matchAll(/\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b/g);
-  for (const m of identMatches) {
-    add(m[1]);
-  }
-  const camelMatches = decisionText.matchAll(/\b([a-z]+(?:[A-Z][a-z]+)+)\b/g);
-  for (const m of camelMatches) {
-    add(m[1]);
-  }
-
-  return terms;
-}
-
-function isDecisionsFile(filePath: string): boolean {
-  const lower = filePath.toLowerCase();
-  return lower.endsWith('decisions.md') || lower.includes('/decisions.md');
-}
 
 const surfaceHeresy: Check = {
   name: 'surface-heresy',
