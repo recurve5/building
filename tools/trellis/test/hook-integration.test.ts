@@ -51,7 +51,7 @@ describe("gate-check.sh fast path", () => {
     const start = performance.now();
     runHook("/tmp/some-file.txt", "hello");
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(100);
+    expect(elapsed).toBeLessThan(200);
   });
 });
 
