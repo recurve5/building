@@ -180,22 +180,31 @@ All Trellis hooks are Claude Code `PreToolUse` hooks on the `Write` tool, config
 
 ### Input
 
-The hook script receives the tool call as JSON on stdin. The relevant fields:
+The hook script receives the tool call as JSON on stdin. Full schema (verified by spike):
 
 ```json
 {
-  "tool_name": "Write",
+  "cwd": "/path/to/project",
+  "hook_event_name": "PreToolUse",
+  "permission_mode": "default",
+  "session_id": "abc123",
   "tool_input": {
-    "file_path": "/absolute/path/to/file",
-    "content": "proposed file content"
-  }
+    "content": "proposed file content",
+    "file_path": "/absolute/path/to/file"
+  },
+  "tool_name": "Write",
+  "tool_use_id": "toolu_xyz",
+  "transcript_path": "/path/to/transcript.jsonl"
 }
 ```
 
-### Output
+### Output (VERIFIED — exit 2 is the only blocking code)
 
 - **Exit code 0:** Allow the write to proceed.
-- **Exit code non-zero:** Block the write. The agent receives the stderr content as the failure message.
+- **Exit code 2:** Block the write. The agent receives stderr as the failure message. The file is NOT modified on disk.
+- **Exit code 1, 3+:** Non-blocking error. Stderr is logged but the **write proceeds**. Do NOT use exit 1 to block gates.
+
+All gate check logic must use `exit 2` to deny a write.
 
 ### Environment
 
@@ -233,11 +242,21 @@ fi
     "PreToolUse": [
       {
         "matcher": "Write",
-        "command": "bash .building/hooks/gate-check.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .building/hooks/gate-check.sh"
+          }
+        ]
       },
       {
         "matcher": "Write",
-        "command": "bash .building/hooks/detection-check.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .building/hooks/detection-check.sh"
+          }
+        ]
       }
     ]
   }
