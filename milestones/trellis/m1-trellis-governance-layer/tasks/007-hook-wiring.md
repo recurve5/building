@@ -2,7 +2,7 @@
 
 **Track:** A
 **Phase:** A2 (hook wiring)
-**Status:** not started
+**Status:** complete
 **Depends on:** 005, 006, 001 (spike findings)
 **Context:**
 - Defaults: project CLAUDE.md, DECISIONS.md, DAY-ZERO.md
