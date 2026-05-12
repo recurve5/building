@@ -25,4 +25,4 @@ else
   check "security-findings-clean" "fail" "Cannot check — security-review.md missing"
 fi
 
-output_result "stage-3-to-4"
+output_result "stage-3-to-4" "$RUN_DIR" "3"

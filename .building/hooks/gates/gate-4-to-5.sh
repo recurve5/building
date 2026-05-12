@@ -30,4 +30,4 @@ if [ -f "$XRD" ] && [ -f "$DECISIONS" ]; then
   fi
 fi
 
-output_result "stage-4-to-5"
+output_result "stage-4-to-5" "$RUN_DIR" "4"

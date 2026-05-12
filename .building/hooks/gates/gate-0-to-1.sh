@@ -23,4 +23,4 @@ else
   check "human-confirmation" "fail" "No run_started event found — human confirmation required"
 fi
 
-output_result "stage-0-to-1"
+output_result "stage-0-to-1" "$RUN_DIR" "0"

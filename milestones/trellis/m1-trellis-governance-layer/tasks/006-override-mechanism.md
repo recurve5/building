@@ -2,7 +2,7 @@
 
 **Track:** A
 **Phase:** A1 (gate scripts — override extension)
-**Status:** not started
+**Status:** complete
 **Depends on:** 005
 **Context:**
 - Defaults: project CLAUDE.md, DECISIONS.md, DAY-ZERO.md

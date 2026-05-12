@@ -23,4 +23,4 @@ else
   check "peer-review-clean" "fail" "Cannot check — peer-review.md missing"
 fi
 
-output_result "stage-5-to-6"
+output_result "stage-5-to-6" "$RUN_DIR" "5"

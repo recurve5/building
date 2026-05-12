@@ -28,4 +28,4 @@ else
   check "stress-tests" "fail" "Cannot check — test-plan.md missing"
 fi
 
-output_result "stage-6-to-7"
+output_result "stage-6-to-7" "$RUN_DIR" "6"

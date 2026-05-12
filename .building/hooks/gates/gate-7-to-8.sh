@@ -25,4 +25,4 @@ else
   check "sdm-review" "fail" "SDM review not found and stage not marked as skipped"
 fi
 
-output_result "stage-7-to-8"
+output_result "stage-7-to-8" "$RUN_DIR" "7"

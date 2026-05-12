@@ -22,4 +22,4 @@ else
   check "tasks-exist" "fail" "Tasks directory not found at $TASKS_DIR"
 fi
 
-output_result "stage-8-to-9"
+output_result "stage-8-to-9" "$RUN_DIR" "8"

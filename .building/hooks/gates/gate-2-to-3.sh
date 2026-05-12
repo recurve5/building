@@ -35,4 +35,4 @@ else
   check "no-unresolved-tier3" "pass" ""
 fi
 
-output_result "stage-2-to-3"
+output_result "stage-2-to-3" "$RUN_DIR" "2"

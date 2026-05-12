@@ -57,4 +57,4 @@ else
   check "building-audit-mechanical" "fail" "building-audit not built — run bootstrap first"
 fi
 
-output_result "stage-9-to-10"
+output_result "stage-9-to-10" "$RUN_DIR" "9"

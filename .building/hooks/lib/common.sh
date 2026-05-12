@@ -28,8 +28,40 @@ check() {
   fi
 }
 
+check_override() {
+  local stage="$1"
+  local run_dir="$2"
+
+  # Both conditions must be met: override file exists AND flag in state.json
+  local has_file="false"
+  local has_flag="false"
+
+  if [ -d "$run_dir/overrides" ]; then
+    local override_files
+    override_files=$(find "$run_dir/overrides" -name "${stage}-*" -type f 2>/dev/null | head -1)
+    if [ -n "$override_files" ]; then
+      has_file="true"
+    fi
+  fi
+
+  if [ -f "$run_dir/state.json" ]; then
+    local in_overrides
+    in_overrides=$(jq --arg s "$stage" '[.overrides[] | select(. == $s)] | length' "$run_dir/state.json" 2>/dev/null || echo "0")
+    if [ "$in_overrides" -gt 0 ]; then
+      has_flag="true"
+    fi
+  fi
+
+  if [ "$has_file" = "true" ] && [ "$has_flag" = "true" ]; then
+    return 0
+  fi
+  return 1
+}
+
 output_result() {
   local gate_name="$1"
+  local run_dir="${2:-}"
+  local stage="${3:-}"
   local end_time
   end_time=$(date +%s%N 2>/dev/null || date +%s)
   local duration=0
@@ -40,18 +72,22 @@ output_result() {
       duration=$(( (end_time - START_TIME) * 1000 ))
     fi
   fi
+
   local passed
   if [ ${#FAILURES[@]} -eq 0 ]; then
+    passed="true"
+  elif [ -n "$run_dir" ] && [ -n "$stage" ] && check_override "$stage" "$run_dir"; then
     passed="true"
   else
     passed="false"
   fi
+
   local checks_json
   checks_json=$(IFS=,; echo "${CHECKS[*]}")
 
   echo "{\"gate\":\"$gate_name\",\"passed\":$passed,\"checks\":[$checks_json],\"duration_ms\":$duration}"
 
-  if [ ${#FAILURES[@]} -gt 0 ]; then
+  if [ "$passed" = "false" ]; then
     for f in "${FAILURES[@]}"; do echo "$f" >&2; done
     exit 1
   fi

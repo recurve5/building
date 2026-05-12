@@ -22,4 +22,4 @@ else
   check "brief-word-count" "fail" "Cannot check word count — brief missing"
 fi
 
-output_result "stage-1-to-2"
+output_result "stage-1-to-2" "$RUN_DIR" "1"

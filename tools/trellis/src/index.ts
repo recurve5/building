@@ -25,3 +25,5 @@ export {
   readEventsForTask,
   nextEventNumber,
 } from "./events.js";
+
+export { writeOverride, addOverrideToState } from "./override.js";

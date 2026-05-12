@@ -25,4 +25,4 @@ else
   check "smoke-test-passing" "fail" "Cannot check — smoke-test-report.md missing"
 fi
 
-output_result "stage-10-to-done"
+output_result "stage-10-to-done" "$RUN_DIR" "10"
