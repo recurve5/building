@@ -2,7 +2,7 @@
 
 **Track:** A
 **Phase:** A1 (standalone gate scripts)
-**Status:** not started
+**Status:** complete
 **Depends on:** 003
 **Context:**
 - Defaults: project CLAUDE.md, DECISIONS.md, DAY-ZERO.md
