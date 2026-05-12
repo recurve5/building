@@ -5,4 +5,6 @@
 tools/building-audit/node_modules/
 tools/building-audit/dist/
 tools/building-audit/coverage/
+tools/trellis/node_modules/
+tools/trellis/dist/
 .building-audit/
