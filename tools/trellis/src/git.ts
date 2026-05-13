@@ -1,80 +1,34 @@
 import { execSync } from "node:child_process";
 
-interface CommitResult {
+export interface CommitResult {
   hash: string;
-  message: string;
+  filesCommitted: string[];
 }
 
-function gitCommit(files: string[], message: string, cwd: string): CommitResult {
-  for (const file of files) {
-    execSync(`git add "${file}"`, { cwd, encoding: "utf-8" });
-  }
-  execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
-    cwd,
-    encoding: "utf-8",
-  });
-  const hash = execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
-  return { hash, message };
-}
-
-export function commitRunStart(
-  cwd: string,
-  runDir: string,
-  stateFile: string,
-): CommitResult {
-  return gitCommit(
-    [runDir, stateFile],
-    "[trellis] Run started",
-    cwd,
-  );
-}
-
-export function commitStageComplete(
-  cwd: string,
-  stage: number,
-  stageName: string,
+export async function commitProjectCode(
+  projectDir: string,
   files: string[],
-): CommitResult {
-  return gitCommit(
-    files,
-    `[trellis] Stage ${stage} complete: ${stageName}`,
-    cwd,
-  );
-}
+  message: string,
+): Promise<CommitResult> {
+  if (files.length === 0) {
+    return { hash: "", filesCommitted: [] };
+  }
 
-export function commitHalt(
-  cwd: string,
-  stateFile: string,
-  reason: string,
-): CommitResult {
-  return gitCommit(
-    [stateFile],
-    `[trellis] Halted: ${reason}`,
-    cwd,
-  );
-}
+  for (const file of files) {
+    execSync(`git -C "${projectDir}" add "${file}"`, { encoding: "utf-8" });
+  }
 
-export function commitOverride(
-  cwd: string,
-  stateFile: string,
-  overrideFile: string,
-  stage: number,
-): CommitResult {
-  return gitCommit(
-    [stateFile, overrideFile],
-    `[trellis] Override: stage ${stage}`,
-    cwd,
-  );
-}
+  try {
+    execSync(`git -C "${projectDir}" commit -m "${message.replace(/"/g, '\\"')}"`, {
+      encoding: "utf-8",
+    });
+  } catch {
+    return { hash: "", filesCommitted: [] };
+  }
 
-export function commitMorningAfter(
-  cwd: string,
-  morningAfterFile: string,
-  confidenceDir: string,
-): CommitResult {
-  return gitCommit(
-    [morningAfterFile, confidenceDir],
-    "[trellis] Morning-after summary",
-    cwd,
-  );
+  const hash = execSync(`git -C "${projectDir}" rev-parse HEAD`, {
+    encoding: "utf-8",
+  }).trim();
+
+  return { hash, filesCommitted: files };
 }

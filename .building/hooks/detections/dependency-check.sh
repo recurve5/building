@@ -8,10 +8,10 @@ RUN_DIR="$1"
 TASK_ID="$2"
 MILESTONE_DIR="$3"
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# PROJECT_DIR provided by detection-check.sh via environment
 
 # Check if any package.json was modified
-PKG_CHANGES=$(git -C "$PROJECT_ROOT" diff --name-only HEAD 2>/dev/null | grep 'package\.json$' || true)
+PKG_CHANGES=$(git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null | grep 'package\.json$' || true)
 
 if [ -z "$PKG_CHANGES" ]; then
   exit 0

@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync, fork } from "node:child_process";
+import { execFileSync, execSync, fork } from "node:child_process";
 import { createFixtureRun } from "./fixtures/factory.js";
-import { writeState, readState, createInitialState } from "../src/state.js";
+import { writeState, readState, createInitialState, snapshotState } from "../src/state.js";
 import { appendEvent, readEvents, nextEventNumber } from "../src/events.js";
 import { generateMorningAfter } from "../src/morning-after.js";
+import { bootstrap } from "../src/bootstrap.js";
+import { createRunDirectory, generateRunId } from "../src/run.js";
 
 const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
 
@@ -228,7 +230,7 @@ describe("STRESS-006: portable bash", () => {
             if (line.endsWith("()") || line.endsWith("{")) continue;
             if (!allowedCommands.has(cmd) && !cmd.startsWith("$") && !cmd.match(/^[A-Z_]+$/)) {
               // Check if it's actually a command and not a variable or function call
-              if (!line.startsWith(cmd + "=") && cmd !== "output_result" && cmd !== "check" && cmd !== "check_override" && cmd !== "check_file_exists" && cmd !== "count_words" && cmd !== "milestone_dir") {
+              if (!line.startsWith(cmd + "=") && cmd !== "output_result" && cmd !== "check" && cmd !== "check_override" && cmd !== "check_file_exists" && cmd !== "count_words" && cmd !== "resolve_project_paths" && cmd !== "derive_project_name") {
                 violations.push(`${file}:${i + 1}: ${cmd}`);
               }
             }
@@ -274,4 +276,127 @@ describe("STRESS-007: concurrent event writes", () => {
     const uniqueNumbers = new Set(numbers);
     expect(uniqueNumbers.size).toBe(200);
   });
+});
+
+// M2 Stress Tests
+
+describe("M2 STRESS-001: state snapshot performance", () => {
+  it("snapshotState p95 under 5ms for 100 invocations", () => {
+    const tmp = makeTmp();
+    const runDir = join(tmp, "run");
+    mkdirSync(runDir, { recursive: true });
+    const state = createInitialState("stress-snap", "test", "m1", "abc", "/tmp/test");
+    state.tasks = {};
+    for (let i = 0; i < 50; i++) {
+      state.tasks[String(i).padStart(3, "0")] = { status: "complete", attempts: 1 };
+    }
+    writeState(runDir, state);
+
+    const times: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const start = performance.now();
+      snapshotState(runDir, i);
+      times.push(performance.now() - start);
+    }
+    times.sort((a, b) => a - b);
+    const p95 = times[Math.floor(times.length * 0.95)];
+    expect(p95).toBeLessThan(5);
+  });
+});
+
+describe("M2 STRESS-002: install idempotency under rapid re-runs", () => {
+  it("10 rapid installs produce correct result", () => {
+    const home = makeTmp();
+    const setupScript = join(PROJECT_ROOT, "tools", "install", "setup.js");
+
+    for (let i = 0; i < 10; i++) {
+      execSync(`node "${setupScript}"`, {
+        cwd: PROJECT_ROOT,
+        env: { ...process.env, HOME: home },
+        stdio: "pipe",
+        timeout: 30000,
+      });
+    }
+
+    const skillPath = join(home, ".claude", "skills", "build", "SKILL.md");
+    expect(existsSync(skillPath)).toBe(true);
+    const content = readFileSync(skillPath, "utf-8");
+    expect(content).toContain("BUILDING_HOME");
+    expect(content).not.toContain("{{BUILDING_HOME}}");
+
+    const settingsPath = join(home, ".claude", "settings.json");
+    if (existsSync(settingsPath)) {
+      const settings = readFileSync(settingsPath, "utf-8");
+      expect(settings).not.toContain("gate-check");
+    }
+  }, 120000);
+});
+
+describe("M2 STRESS-003: large state directory handling", () => {
+  it("100 projects do not affect single-project operations", async () => {
+    const home = makeTmp();
+    const projectsDir = join(home, "projects");
+    mkdirSync(projectsDir, { recursive: true });
+
+    // Create 100 project state dirs
+    for (let i = 0; i < 100; i++) {
+      const name = `project-${String(i).padStart(3, "0")}`;
+      const stateDir = join(projectsDir, name);
+      mkdirSync(join(stateDir, "runs"), { recursive: true });
+      writeFileSync(
+        join(stateDir, "project.lock"),
+        JSON.stringify({ project_dir: `/tmp/${name}`, project_name: name, created: new Date().toISOString() }),
+      );
+    }
+
+    // Bootstrap 101st
+    const start = performance.now();
+    const newState = join(projectsDir, "project-101");
+    await bootstrap("project-101", newState, "/tmp/project-101");
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(1000);
+    expect(existsSync(join(newState, "project.lock"))).toBe(true);
+  });
+});
+
+describe("M2 STRESS-004: gate script invocation latency", () => {
+  it("p95 under 200ms for validation-failure gate checks", () => {
+    const tmp = makeTmp();
+    const projectState = join(tmp, "state");
+    const runDir = join(projectState, "runs", "test-run");
+    const milestoneDir = join(projectState, "milestones", "m1-test");
+    mkdirSync(join(runDir, "events"), { recursive: true });
+    mkdirSync(join(runDir, "overrides"), { recursive: true });
+    mkdirSync(milestoneDir, { recursive: true });
+
+    const state = createInitialState("test-run", "test", "m1-test", "abc", "/tmp/test");
+    writeState(runDir, state);
+    const stateJson = join(runDir, "state.json");
+
+    const env = {
+      BUILDING_HOME: PROJECT_ROOT,
+      PROJECT_DIR: "/tmp/test",
+      PROJECT_STATE: projectState,
+      PATH: process.env.PATH || "",
+      HOME: process.env.HOME || "",
+    };
+
+    const times: number[] = [];
+    for (let i = 0; i < 50; i++) {
+      const start = performance.now();
+      try {
+        execSync(`bash "${PROJECT_ROOT}/.building/hooks/gate-check.sh" 0 3 "${stateJson}"`, {
+          env,
+          encoding: "utf-8",
+          stdio: "pipe",
+        });
+      } catch {
+        // Expected: skip validation fails
+      }
+      times.push(performance.now() - start);
+    }
+    times.sort((a, b) => a - b);
+    const p95 = times[Math.floor(times.length * 0.95)];
+    expect(p95).toBeLessThan(200);
+  }, 30000);
 });

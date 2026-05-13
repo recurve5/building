@@ -14,6 +14,7 @@ export {
   writeState,
   validateTransition,
   createInitialState,
+  snapshotState,
 } from "./state.js";
 
 export { generateRunId, createRunDirectory } from "./run.js";
@@ -36,10 +37,16 @@ export {
 
 export { assessConfidence, writeConfidenceFiles } from "./confidence.js";
 
+export type { CommitResult } from "./git.js";
+export { commitProjectCode } from "./git.js";
+
+export type { BootstrapResult } from "./bootstrap.js";
+export { bootstrap } from "./bootstrap.js";
+
+export type { BuildingPaths } from "./paths.js";
 export {
-  commitRunStart,
-  commitStageComplete,
-  commitHalt,
-  commitOverride,
-  commitMorningAfter,
-} from "./git.js";
+  deriveProjectName,
+  resolvePaths,
+  resolveRunDir,
+  resolveMilestoneDir,
+} from "./paths.js";

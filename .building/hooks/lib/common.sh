@@ -108,18 +108,30 @@ count_words() {
   wc -w < "$1" | tr -d ' '
 }
 
-milestone_dir() {
-  local run_dir="$1"
-  local milestone
-  milestone=$(jq -r '.milestone' "$run_dir/state.json")
-  local project_root
-  project_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-  # Search for the milestone directory
-  local found
-  found=$(find "$project_root/milestones" -type d -name "$milestone" 2>/dev/null | head -1)
-  if [ -n "$found" ]; then
-    echo "$found"
-  else
-    echo ""
+derive_project_name() {
+  local dir="$1"
+  dir="${dir%/}"
+  local name
+  name=$(basename "$dir")
+  name=$(echo "$name" | tr '[:upper:]' '[:lower:]')
+  name=$(echo "$name" | tr ' _' '-')
+  name=$(echo "$name" | sed 's/[^a-z0-9-]//g')
+  name=$(echo "$name" | sed 's/--*/-/g')
+  name=$(echo "$name" | sed 's/^-//;s/-$//')
+
+  if [ -z "$name" ]; then
+    echo "ERROR: Cannot derive project name from directory '$(basename "$dir")'" >&2
+    return 1
   fi
+  echo "$name"
 }
+
+resolve_project_paths() {
+  if [ -z "${BUILDING_HOME:-}" ] || [ -z "${PROJECT_DIR:-}" ] || [ -z "${PROJECT_STATE:-}" ]; then
+    echo "ERROR: BUILDING_HOME, PROJECT_DIR, and PROJECT_STATE must be set" >&2
+    exit 1
+  fi
+  PROJECT_NAME=$(derive_project_name "$PROJECT_DIR")
+  export PROJECT_DIR PROJECT_NAME PROJECT_STATE
+}
+

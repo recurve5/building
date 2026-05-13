@@ -8,7 +8,7 @@ RUN_DIR="$1"
 TASK_ID="$2"
 MILESTONE_DIR="$3"
 
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# PROJECT_DIR provided by detection-check.sh via environment
 
 # Find the task file
 TASK_FILE=$(find "$MILESTONE_DIR/tasks" -name "${TASK_ID}-*" -type f 2>/dev/null | head -1)
@@ -24,7 +24,7 @@ if [ -z "$DECLARED_FILES" ]; then
 fi
 
 # Check git diff for uncommitted changes
-CHANGED_FILES=$(git -C "$PROJECT_ROOT" diff --name-only HEAD 2>/dev/null || true)
+CHANGED_FILES=$(git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null || true)
 
 if [ -z "$CHANGED_FILES" ]; then
   exit 0

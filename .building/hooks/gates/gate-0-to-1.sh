@@ -8,9 +8,8 @@ source "$(dirname "$0")/../lib/common.sh"
 RUN_DIR="$1"
 MILESTONE_DIR="$2"
 
-# Check milestone list exists (milestone directories under milestones/)
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-if [ -d "$PROJECT_ROOT/milestones" ] && [ "$(find "$PROJECT_ROOT/milestones" -mindepth 1 -maxdepth 2 -type d -name 'm*' 2>/dev/null | wc -l | tr -d ' ')" -gt 0 ]; then
+# Check milestone list exists (milestone directories under PROJECT_STATE/milestones/)
+if [ -d "$PROJECT_STATE/milestones" ] && [ "$(find "$PROJECT_STATE/milestones" -mindepth 1 -maxdepth 1 -type d -name 'm*' 2>/dev/null | wc -l | tr -d ' ')" -gt 0 ]; then
   check "milestone-list-exists" "pass" ""
 else
   check "milestone-list-exists" "fail" "No milestone directories found under milestones/"

@@ -7,7 +7,7 @@ source "$(dirname "$0")/../lib/common.sh"
 
 RUN_DIR="$1"
 MILESTONE_DIR="$2"
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# BUILDING_HOME provided by gate-check.sh via environment
 
 # Check all tasks complete (from state.json)
 if [ -f "$RUN_DIR/state.json" ]; then
@@ -38,7 +38,7 @@ else
 fi
 
 # Invoke building-audit --mechanical
-AUDIT_BIN="$PROJECT_ROOT/tools/building-audit/dist/bin/building-audit.js"
+AUDIT_BIN="$BUILDING_HOME/tools/building-audit/dist/bin/building-audit.js"
 if [ -f "$AUDIT_BIN" ]; then
   MILESTONE_NAME=$(basename "$MILESTONE_DIR")
   AUDIT_OUTPUT=$(mktemp)

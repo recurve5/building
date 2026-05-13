@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { TrellisState, StageRecord, TaskRecord } from "./types.js";
@@ -28,10 +28,15 @@ export function readState(runDir: string): TrellisState {
 }
 
 export function writeState(runDir: string, state: TrellisState): void {
-  validateSchema(state);
+  const upgraded: TrellisState = {
+    ...state,
+    version: 2,
+    project_dir: state.project_dir || "",
+  };
+  validateSchema(upgraded);
   const filePath = join(runDir, "state.json");
   const tmpPath = join(dirname(filePath), `.state.${randomBytes(4).toString("hex")}.tmp`);
-  writeFileSync(tmpPath, JSON.stringify(state, null, 2) + "\n", "utf-8");
+  writeFileSync(tmpPath, JSON.stringify(upgraded, null, 2) + "\n", "utf-8");
   renameSync(tmpPath, filePath);
 }
 
@@ -67,11 +72,19 @@ export function validateTransition(
   return { valid: true, reason: null };
 }
 
+export function snapshotState(runDir: string, stageNumber: number): void {
+  const source = join(runDir, "state.json");
+  if (!existsSync(source)) return;
+  const dest = join(runDir, `state.json.stage-${stageNumber}`);
+  copyFileSync(source, dest);
+}
+
 export function createInitialState(
   runId: string,
   project: string,
   milestone: string,
   briefHash: string,
+  projectDir: string = "",
 ): TrellisState {
   const stages: Record<string, StageRecord> = {};
   for (let i = 0; i <= 11; i++) {
@@ -95,7 +108,8 @@ export function createInitialState(
     halt_reason: null,
     overrides: [],
     detections: [],
-    version: 1,
+    project_dir: projectDir,
+    version: 2,
   };
 }
 
@@ -121,7 +135,11 @@ function validateSchema(obj: unknown): asserts obj is TrellisState {
     throw new Error("current_stage must be a number");
   }
 
-  if (state.version !== 1) {
+  if (state.version !== 1 && state.version !== 2) {
     throw new Error(`Unsupported schema version: ${state.version}`);
+  }
+
+  if (state.version === 2 && typeof state.project_dir !== "string") {
+    throw new Error("version 2 state requires project_dir as a string");
   }
 }

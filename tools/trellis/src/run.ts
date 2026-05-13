@@ -21,10 +21,10 @@ export function generateRunId(briefContent: string, timestamp?: Date): string {
 }
 
 export function createRunDirectory(
-  buildingDir: string,
+  projectState: string,
   runId: string,
 ): string {
-  const runDir = join(buildingDir, "runs", runId);
+  const runDir = join(projectState, "runs", runId);
   for (const sub of ["events", "overrides", "detections", "confidence"]) {
     mkdirSync(join(runDir, sub), { recursive: true });
   }

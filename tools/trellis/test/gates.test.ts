@@ -19,12 +19,20 @@ function runGate(
   runDir: string,
   milestoneDir: string,
 ): { result: GateResult; exitCode: number; stderr: string } {
+  const projectState = join(milestoneDir, "..", "..");
   const cmd = `bash "${join(GATES_DIR, script)}" "${runDir}" "${milestoneDir}"`;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       encoding: "utf-8",
-      env: { ...process.env, PATH: process.env.PATH },
+      env: {
+        ...process.env,
+        PATH: process.env.PATH,
+        BUILDING_HOME: PROJECT_ROOT,
+        PROJECT_DIR: "/tmp/test-project",
+        PROJECT_STATE: projectState,
+        PROJECT_NAME: "test-project",
+      },
     });
     return { result: JSON.parse(stdout.trim()), exitCode: 0, stderr: "" };
   } catch (err: unknown) {
@@ -43,8 +51,9 @@ function runGate(
 
 function makeFixture(): { runDir: string; milestoneDir: string } {
   const tmp = mkdtempSync(join(tmpdir(), "trellis-gate-"));
-  const runDir = join(tmp, "run");
-  const milestoneDir = join(tmp, "milestone");
+  const projectState = join(tmp, "state");
+  const runDir = join(projectState, "runs", "test-run");
+  const milestoneDir = join(projectState, "milestones", "m1-test");
   mkdirSync(join(runDir, "events"), { recursive: true });
   mkdirSync(join(runDir, "overrides"), { recursive: true });
   mkdirSync(milestoneDir, { recursive: true });
@@ -65,7 +74,8 @@ function makeFixture(): { runDir: string; milestoneDir: string } {
       halt_reason: null,
       overrides: [],
       detections: [],
-      version: 1,
+      project_dir: "/tmp/test-project",
+      version: 2,
     }),
   );
 

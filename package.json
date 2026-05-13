@@ -1,0 +1,9 @@
+{
+  "name": "building",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node tools/install/setup.js",
+    "uninstall": "node tools/install/uninstall.js"
+  }
+}

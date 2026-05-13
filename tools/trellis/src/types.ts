@@ -34,8 +34,11 @@ export interface TrellisState {
   /** Detection record filenames (without path) */
   detections: string[];
 
+  /** Absolute path to the developer's project directory */
+  project_dir: string;
+
   /** Schema version for forward compatibility */
-  version: 1;
+  version: 1 | 2;
 }
 
 export interface StageRecord {

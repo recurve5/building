@@ -1,145 +1,75 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { randomBytes } from "node:crypto";
 
 export interface BootstrapResult {
   created: string[];
-  hooksInstalled: string[];
-  dependenciesInstalled: boolean;
-  commitHash: string | null;
   alreadyBootstrapped: boolean;
 }
 
-const HOOK_ENTRY = {
-  matcher: "Write",
-  hooks: [{ type: "command", command: "" }],
-};
+interface ProjectLock {
+  project_dir: string;
+  project_name: string;
+  created: string;
+}
+
+function atomicWrite(filePath: string, content: string): void {
+  const tmpPath = join(dirname(filePath), `.${randomBytes(4).toString("hex")}.tmp`);
+  writeFileSync(tmpPath, content, "utf-8");
+  renameSync(tmpPath, filePath);
+}
 
 export async function bootstrap(
-  projectRoot: string,
   projectName: string,
+  projectState: string,
+  projectDir: string,
 ): Promise<BootstrapResult> {
-  const created: string[] = [];
-  const hooksInstalled: string[] = [];
-  let dependenciesInstalled = false;
+  const lockPath = join(projectState, "project.lock");
 
-  const buildingDir = join(projectRoot, ".building");
-  const alreadyBootstrapped = existsSync(join(buildingDir, "config.json"));
-
-  // 1. Create directory structure
-  for (const dir of [
-    "runs",
-    "hooks/gates",
-    "hooks/detections",
-    "hooks/lib",
-  ]) {
-    const fullPath = join(buildingDir, dir);
-    if (!existsSync(fullPath)) {
-      mkdirSync(fullPath, { recursive: true });
-      created.push(`.building/${dir}`);
+  if (existsSync(lockPath)) {
+    const lock: ProjectLock = JSON.parse(readFileSync(lockPath, "utf-8"));
+    if (lock.project_dir !== projectDir) {
+      throw new Error(
+        `Project name '${projectName}' is already in use by ${lock.project_dir}.\nRename one directory or use a symlink.`,
+      );
     }
+    return { created: [], alreadyBootstrapped: true };
   }
 
-  // Write config.json
-  const configPath = join(buildingDir, "config.json");
-  if (!existsSync(configPath)) {
-    writeFileSync(
-      configPath,
-      JSON.stringify(
-        {
-          project: projectName,
-          version: "1.0.0",
-          bootstrapped: new Date().toISOString(),
-        },
-        null,
-        2,
-      ) + "\n",
-    );
-    created.push(".building/config.json");
-  }
+  const created: string[] = [];
 
-  // 2. Add hook entries to settings.local.json
-  const settingsPath = join(projectRoot, ".claude", "settings.local.json");
-  let settings: Record<string, unknown> = {};
-  if (existsSync(settingsPath)) {
-    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-  } else {
-    mkdirSync(join(projectRoot, ".claude"), { recursive: true });
-  }
-
-  if (!settings.hooks) {
-    settings.hooks = { PreToolUse: [] };
-  }
-  const hooks = settings.hooks as { PreToolUse: Array<{ matcher: string; hooks: Array<{ type: string; command: string }> }> };
-  if (!hooks.PreToolUse) {
-    hooks.PreToolUse = [];
-  }
-
-  const hookScripts = [
-    "bash .building/hooks/gate-check.sh",
-    "bash .building/hooks/detection-check.sh",
+  const dirs = [
+    projectState,
+    join(projectState, "runs"),
+    join(projectState, "milestones"),
   ];
 
-  for (const cmd of hookScripts) {
-    const exists = hooks.PreToolUse.some((h) =>
-      h.hooks?.some((inner) => inner.command === cmd),
-    );
-    if (!exists) {
-      hooks.PreToolUse.push({
-        matcher: "Write",
-        hooks: [{ type: "command", command: cmd }],
-      });
-      hooksInstalled.push(cmd);
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+      created.push(dir);
     }
   }
 
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-
-  // 3. Verify dependencies
-  for (const pkg of ["tools/building-audit", "tools/trellis"]) {
-    const pkgDir = join(projectRoot, pkg);
-    if (!existsSync(pkgDir)) continue;
-
-    const nmDir = join(pkgDir, "node_modules");
-    if (!existsSync(nmDir)) {
-      execSync("npm install", { cwd: pkgDir, encoding: "utf-8" });
-      dependenciesInstalled = true;
-    }
-
-    const distDir = join(pkgDir, "dist");
-    if (!existsSync(distDir)) {
-      execSync("npm run build", { cwd: pkgDir, encoding: "utf-8" });
-      dependenciesInstalled = true;
-    }
+  const decisionsPath = join(projectState, "DECISIONS.md");
+  if (!existsSync(decisionsPath)) {
+    atomicWrite(decisionsPath, "# Decisions Log\n");
+    created.push(decisionsPath);
   }
 
-  // 4. Commit
-  let commitHash: string | null = null;
-  try {
-    const status = execSync("git status --porcelain", {
-      cwd: projectRoot,
-      encoding: "utf-8",
-    });
-    if (status.trim().length > 0) {
-      execSync("git add .building/", { cwd: projectRoot, encoding: "utf-8" });
-      execSync('git commit -m "[trellis] Bootstrap"', {
-        cwd: projectRoot,
-        encoding: "utf-8",
-      });
-      commitHash = execSync("git rev-parse HEAD", {
-        cwd: projectRoot,
-        encoding: "utf-8",
-      }).trim();
-    }
-  } catch {
-    // Git commit may fail if nothing to commit
+  const openItemsPath = join(projectState, "OPEN-ITEMS.md");
+  if (!existsSync(openItemsPath)) {
+    atomicWrite(openItemsPath, "# Open Items\n");
+    created.push(openItemsPath);
   }
 
-  return {
-    created,
-    hooksInstalled,
-    dependenciesInstalled,
-    commitHash,
-    alreadyBootstrapped,
+  const lock: ProjectLock = {
+    project_dir: projectDir,
+    project_name: projectName,
+    created: new Date().toISOString(),
   };
+  atomicWrite(lockPath, JSON.stringify(lock, null, 2) + "\n");
+  created.push(lockPath);
+
+  return { created, alreadyBootstrapped: false };
 }
