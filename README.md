@@ -125,15 +125,27 @@ building-audit --full                    # milestone-close audit (needs ANTHROPI
 
 See `tools/building-audit/` for source, `milestones/building-audit/` for PRD, XRD, peer review, security review, and decisions log.
 
-### building-orchestrator (next)
+### Governance layer
 
-The follow-on milestone. A code-based build harness — `building-run` — that mechanically enforces the pipeline. Markdown rules can be silently dropped under context pressure; code can't. Brief in `milestones/building-orchestrator/`. Depends on building-audit.
+Gate scripts, state management, event logging, override tracking, confidence assessment, and morning-after report generation — all in TypeScript with zero runtime dependencies beyond Node built-ins. This is what the `/build` skill runs on top of.
+
+It enforces the same 12-stage pipeline defined in `orchestrator.md`, but mechanically: gate checks are bash scripts that read JSON state and pass or fail. The orchestrator cannot skip a stage because the script won't let it.
+
+```sh
+cd ~/building/tools/trellis && npm install && npm test
+```
+
+See `tools/trellis/` for source, `milestones/trellis/` for planning artifacts.
 
 ---
 
 ## How to use it
 
-### New project
+There are two ways to run building. Both use the same agents, the same pipeline stages, and the same decision tiers. They differ in how gates are enforced.
+
+### Option A: Markdown pipeline
+
+The pipeline lives in markdown files. The orchestrator is an LLM agent that reads `orchestrator.md` and follows the stages, gates, and routing defined there. Gates are enforced by the orchestrator's adherence to the protocol.
 
 1. Clone this repo to `~/building/`.
 2. Create your project directory with a `CLAUDE.md` that references the master files: `Read ~/building/orchestrator.md. You are the orchestrator.`
@@ -141,11 +153,43 @@ The follow-on milestone. A code-based build harness — `building-run` — that 
 4. Give it your idea brief — one sentence to a full page.
 5. The orchestrator runs the pipeline. You'll be asked for input at Tier 3 decision points. Everything else runs autonomously.
 
-### Existing codebase
+For an existing codebase, tell the orchestrator: "This is an existing codebase." The SDM agent assesses what exists before the architecture stage — preventing rewrites where modifications would suffice.
 
-Same as above, but tell the orchestrator: "This is an existing codebase." The SDM agent assesses what exists before the architecture stage — preventing rewrites where modifications would suffice.
+### Option B: `/build` skill
 
-### What to expect
+A TypeScript governance layer that enforces the same pipeline mechanically. Gate checks run as bash scripts. State is persisted to JSON on disk. The orchestrator cannot silently skip a stage because the gate script will fail.
+
+**Install:**
+
+```sh
+cd ~/building
+npm run setup
+```
+
+This builds the governance layer, creates `~/.building/` for state storage, and installs a `/build` skill into Claude Code (`~/.claude/skills/build/SKILL.md`).
+
+**Use from any project directory:**
+
+```sh
+cd ~/your-project
+/build brief.md                              # start a new run from a brief
+/build --status                              # show current run state
+/build --resume                              # pick up where you left off
+/build --override <stage> --reason "..."     # override a failed gate
+```
+
+State lives at `~/.building/projects/<project-name>/` — outside your project repo. Each run gets its own directory with event logs, gate results, confidence assessments, and state snapshots at every stage transition.
+
+**Uninstall:**
+
+```sh
+cd ~/building
+npm run uninstall
+```
+
+This removes the skill file but preserves all project state under `~/.building/`.
+
+### What to expect (both options)
 
 The orchestrator will stop for your input at these points:
 - **After the product agent's playback** — confirming it understood your brief correctly.
@@ -182,8 +226,11 @@ Between those points, the pipeline runs autonomously.
     roadmap.md                   # Open design questions.
   tools/
     building-audit/              # The audit CLI (M1, shipped).
+    trellis/                     # Governance layer: gate scripts, state, events.
+    install/                     # Setup and uninstall scripts, skill template.
   milestones/
     building-audit/              # M1 PRD, XRD, peer review, decisions.
+    trellis/                     # Governance layer PRD, XRD, peer review, tasks.
     building-orchestrator/       # M2 brief.
 ```
 

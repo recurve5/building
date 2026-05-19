@@ -19,7 +19,7 @@ function makePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
     stageName: 'Build',
     halted: false,
     haltReason: null,
-    overrides: [],
+    stageOverrides: [],
     completedTasks: [],
     currentTask: null,
     remainingTasks: [],
@@ -99,8 +99,12 @@ describe('M3 stress tests', { timeout: 60_000 }, () => {
         { description: 'Auth strategy', context: 'Tier 3' },
         { description: 'Deploy target', context: 'Tier 3' },
       ],
-      auditSummary: { l1Findings: 15, l2Findings: 5, detectionFiles: Array.from({ length: 15 }, (_, i) => `l1-task-${i + 1}.json`) },
-      gitCheckpoints: Array.from({ length: 6 }, (_, i) => `audit/m3-checkpoint-${i + 1}`),
+      auditSummary: {
+        l1Findings: Array.from({ length: 15 }, (_, i) => ({ taskId: i + 1, check: `check-${i + 1}`, action: 'generate-task', filePath: `src/mod-${i + 1}.ts` })),
+        l2Findings: Array.from({ length: 5 }, (_, i) => ({ check: `l2-check-${i + 1}`, action: 'generate-task' })),
+        detectionFiles: Array.from({ length: 15 }, (_, i) => `l1-task-${i + 1}.json`),
+      },
+      gitCheckpoints: Array.from({ length: 6 }, (_, i) => ({ type: 'tag', ref: `audit/m3-checkpoint-${i + 1}` })),
       artifactPaths: Array.from({ length: 10 }, (_, i) => `m3-bridge/artifact-${i + 1}.md`),
     });
 
@@ -159,7 +163,7 @@ describe('M3 stress tests', { timeout: 60_000 }, () => {
       const header = readHandoffHeader(tmpDir);
 
       expect(header).not.toBeNull();
-      expect(header!.currentStage).toBe(i % 12);
+      expect(header!.stage).toBe(i % 12);
       expect(header!.completedTaskCount).toBe(i + 1);
     }
 

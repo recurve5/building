@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { writeHandoff } from '../../src/bridge/handoff-writer.js';
@@ -21,7 +21,7 @@ function makePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
     stageName: 'Build',
     halted: false,
     haltReason: null,
-    overrides: [],
+    stageOverrides: [],
     completedTasks: [
       { number: 1, shortName: 'setup', status: 'done' },
       { number: 2, shortName: 'schema', status: 'done' },
@@ -79,8 +79,8 @@ describe('M3 integration tests', () => {
     expect(header!.runId).toBe(payload.runId);
     expect(header!.project).toBe(payload.project);
     expect(header!.milestone).toBe(payload.milestone);
-    expect(header!.currentStage).toBe(payload.stage);
-    expect(header!.currentStageName).toBe(payload.stageName);
+    expect(header!.stage).toBe(payload.stage);
+    expect(header!.stageName).toBe(payload.stageName);
     expect(header!.halted).toBe(payload.halted);
     expect(header!.haltReason).toBeNull();
     expect(header!.completedTaskCount).toBe(payload.completedTasks.length);
@@ -113,14 +113,18 @@ describe('M3 integration tests', () => {
 
     expect(existsSync(join(tmpDir, 'handoff.md'))).toBe(true);
     expect(existsSync(join(tmpDir, 'continue'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'events', 'session_boundary.json'))).toBe(true);
-    expect(existsSync(join(tmpDir, 'events', 'handoff_written.json'))).toBe(true);
 
-    const sbEvent = JSON.parse(readFileSync(join(tmpDir, 'events', 'session_boundary.json'), 'utf-8'));
+    const eventFiles = readdirSync(join(tmpDir, 'events'));
+    const sbFile = eventFiles.find((f) => f.endsWith('-session_boundary.json'));
+    const hwFile = eventFiles.find((f) => f.endsWith('-handoff_written.json'));
+    expect(sbFile).toBeDefined();
+    expect(hwFile).toBeDefined();
+
+    const sbEvent = JSON.parse(readFileSync(join(tmpDir, 'events', sbFile!), 'utf-8'));
     expect(sbEvent.event).toBe('session_boundary');
     expect(sbEvent.stage).toBe(4);
 
-    const hwEvent = JSON.parse(readFileSync(join(tmpDir, 'events', 'handoff_written.json'), 'utf-8'));
+    const hwEvent = JSON.parse(readFileSync(join(tmpDir, 'events', hwFile!), 'utf-8'));
     expect(hwEvent.event).toBe('handoff_written');
     expect(hwEvent.trigger).toBe('batch-complete');
   });
@@ -150,9 +154,9 @@ describe('M3 integration tests', () => {
     const state = JSON.parse(readFileSync(join(tmpDir, 'state.json'), 'utf-8'));
 
     expect(header).not.toBeNull();
-    expect(header!.currentStage).toBe(7);
+    expect(header!.stage).toBe(7);
     expect(state.current_stage).toBe(5);
-    expect(header!.currentStage).not.toBe(state.current_stage);
+    expect(header!.stage).not.toBe(state.current_stage);
   });
 
   it('INT-006: mixed detections array — inline object + file reference', () => {

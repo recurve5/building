@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { renderHandoff, writeHandoff, removeContinueFile } from '../../src/bridge/handoff-writer.js';
+import { readHandoffHeader } from '../../src/bridge/handoff-reader.js';
 import type { HandoffPayload } from '../../src/bridge/types.js';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,7 @@ function makePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
     stageName: 'Build',
     halted: false,
     haltReason: null,
-    overrides: [],
+    stageOverrides: [],
     completedTasks: [
       { number: 1, shortName: 'setup-project', status: 'done' },
       { number: 2, shortName: 'create-schema', status: 'done' },
@@ -38,11 +39,19 @@ function makePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
       { description: 'Auth strategy TBD', context: 'Tier 3 — needs product input' },
     ],
     auditSummary: {
-      l1Findings: 2,
-      l2Findings: 1,
+      l1Findings: [
+        { taskId: 1, check: 'ghost-refactor', action: 'generate-task', filePath: 'src/old.ts' },
+        { taskId: 2, check: 'test-cheat', action: 'generate-task', filePath: 'src/test.ts' },
+      ],
+      l2Findings: [
+        { check: 'dead-code', action: 'generate-task' },
+      ],
       detectionFiles: ['l1-ghost-refactor.json', 'l2-dead-code.json'],
     },
-    gitCheckpoints: ['audit/m3-pre-build', 'audit/m3-post-task-2'],
+    gitCheckpoints: [
+      { type: 'tag', ref: 'audit/m3-pre-build' },
+      { type: 'tag', ref: 'audit/m3-post-task-2' },
+    ],
     artifactPaths: ['m3-bridge/PRD.md', 'm3-bridge/XRD.md'],
     nextStep: 'Resume task 3: write-api',
     ...overrides,
@@ -127,6 +136,7 @@ describe('handoff-writer', () => {
     const output = renderHandoff(makePayload());
     expect(output).toContain('L1 Findings');
     expect(output).toContain('L2 Findings');
+    expect(output).toContain('ghost-refactor');
     expect(output).toContain('l1-ghost-refactor.json');
   });
 
@@ -141,7 +151,7 @@ describe('handoff-writer', () => {
       auditSummary: null,
       gitCheckpoints: [],
       artifactPaths: [],
-      overrides: [],
+      stageOverrides: [],
     }));
     expect(output).toContain('_None_');
     expect(output).toContain('_No audit run this session._');
@@ -216,6 +226,55 @@ describe('handoff-writer', () => {
     const content = readFileSync(join(tmpDir, 'handoff.md'), 'utf-8');
     expect(content).toContain('run-overwrite');
     expect(content).not.toContain('old content');
+  });
+
+  // BF-007: Structured stageOverrides render with stage number and reason
+  it('BF-007: structured stageOverrides renders stage number and reason', () => {
+    const output = renderHandoff(makePayload({
+      stageOverrides: [{ stage: 2, reason: 'human override' }],
+    }));
+    expect(output).toContain('Stage 2: human override');
+  });
+
+  // BF-008: Structured gitCheckpoints render with type and ref
+  it('BF-008: structured gitCheckpoints renders type and ref per checkpoint', () => {
+    const output = renderHandoff(makePayload({
+      gitCheckpoints: [{ type: 'tag', ref: 'milestone/m1-start' }],
+    }));
+    expect(output).toContain('tag: milestone/m1-start');
+  });
+
+  // BF-009: Structured l1Findings render per-finding detail
+  it('BF-009: structured auditSummary.l1Findings renders per-finding detail', () => {
+    const output = renderHandoff(makePayload({
+      auditSummary: {
+        l1Findings: [{ taskId: 3, check: 'test-cheat', action: 'generate-task', filePath: 'src/foo.ts' }],
+        l2Findings: [],
+        detectionFiles: [],
+      },
+    }));
+    expect(output).toContain('Task 3: test-cheat');
+    expect(output).toContain('generate-task');
+    expect(output).toContain('src/foo.ts');
+  });
+
+  // BF-010: Remediation tasks with originatingTask render correctly
+  it('BF-010: remediationTasks with originatingTask renders originating task number', () => {
+    const output = renderHandoff(makePayload({
+      remediationTasks: [{ number: 14, shortName: 'fix-cheat', status: 'not started', originatingTask: 3 }],
+    }));
+    expect(output).toContain('from task 3');
+  });
+
+  // BF-011: Write handoff with stage/stageName, read header returns stage/stageName
+  it('BF-011: write handoff with stage/stageName, read header returns stage/stageName', () => {
+    writeHandoff(tmpDir, makePayload({ stage: 5, stageName: 'Peer Review' }));
+    const header = readHandoffHeader(tmpDir);
+    expect(header).not.toBeNull();
+    expect(header!.stage).toBe(5);
+    expect(header!.stageName).toBe('Peer Review');
+    expect((header as any).currentStage).toBeUndefined();
+    expect((header as any).currentStageName).toBeUndefined();
   });
 
   // HW-016

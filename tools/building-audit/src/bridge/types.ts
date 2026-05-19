@@ -11,6 +11,7 @@ export interface ClassifiedFinding {
   finding: Finding;
   tier: Tier;
   action: Action;
+  source: 'contextual_promotion' | 'policy_default' | 'depth_limit' | 'unknown_check';
 }
 
 /** Specification for generating a remediation task from a finding. */
@@ -51,6 +52,12 @@ export interface Detection {
 }
 
 /** An action taken in response to a detection. */
+export type DetectionEntry = Detection | string;
+
+export function isDetectionObject(entry: unknown): entry is Detection {
+  return typeof entry === 'object' && entry !== null && 'timestamp' in entry;
+}
+
 export interface DetectionAction {
   type: 'blocked' | 'task-created' | 'escalated' | 'accepted';
   taskNumber: number | null;
@@ -71,23 +78,23 @@ export interface HandoffPayload {
   stageName: string;
   halted: boolean;
   haltReason: string | null;
-  overrides: number[];
+  stageOverrides: Array<{ stage: number; reason: string }>;
 
   completedTasks: Array<{ number: number; shortName: string; status: string }>;
   currentTask: { number: number; shortName: string; status: string } | null;
   remainingTasks: Array<{ number: number; shortName: string; status: string }>;
-  remediationTasks: Array<{ number: number; shortName: string; status: string }>;
+  remediationTasks: Array<{ number: number; shortName: string; status: string; originatingTask: number }>;
 
   decisions: Array<{ number: number; decision: string; rationale: string }>;
   openItems: Array<{ description: string; context: string }>;
 
   auditSummary: {
-    l1Findings: number;
-    l2Findings: number;
+    l1Findings: Array<{ taskId: number; check: string; action: string; filePath: string }>;
+    l2Findings: Array<{ check: string; action: string }>;
     detectionFiles: string[];
   } | null;
 
-  gitCheckpoints: string[];
+  gitCheckpoints: Array<{ type: string; ref: string }>;
   artifactPaths: string[];
   nextStep: string;
 }
@@ -96,8 +103,8 @@ export interface HandoffHeader {
   runId: string;
   project: string;
   milestone: string;
-  currentStage: number;
-  currentStageName: string;
+  stage: number;
+  stageName: string;
   halted: boolean;
   haltReason: string | null;
   completedTaskCount: number;

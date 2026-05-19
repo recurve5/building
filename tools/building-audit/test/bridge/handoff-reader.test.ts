@@ -43,8 +43,8 @@ describe('readHandoffHeader', () => {
     expect(result!.runId).toBe('20260519T0450Z-a66c014');
     expect(result!.project).toBe('test-project');
     expect(result!.milestone).toBe('m3-context-management');
-    expect(result!.currentStage).toBe(5);
-    expect(result!.currentStageName).toBe('Peer Review');
+    expect(result!.stage).toBe(5);
+    expect(result!.stageName).toBe('Peer Review');
     expect(result!.halted).toBe(false);
     expect(result!.haltReason).toBeNull();
     expect(result!.completedTaskCount).toBe(3);
@@ -82,7 +82,7 @@ describe('readHandoffHeader', () => {
     });
     const result = readHandoffHeader(tmpDir);
     expect(result).not.toBeNull();
-    expect(result!.currentStage).toBe(12);
+    expect(result!.stage).toBe(12);
     expect(result!.completedTaskCount).toBe(47);
     expect(result!.remainingTaskCount).toBe(0);
   });
@@ -138,7 +138,7 @@ describe('readHandoffHeader', () => {
     expect(result).not.toBeNull();
     expect(result!.runId).toBe('abc-123');
     expect(result!.project).toBe('body-test');
-    expect(result!.currentStage).toBe(3);
+    expect(result!.stage).toBe(3);
     expect(result!.currentTaskNumber).toBe(4);
   });
 

@@ -9,7 +9,7 @@
 // This module does NOT call the LLM. The orchestrator evaluates the prompts
 // in its own session.
 
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { runMilestoneCloseAudit } from './milestone-close-audit.js';
 import { JUDGMENT_PROMPTS } from './judgment-prompts.js';
@@ -69,6 +69,7 @@ export interface FinalizeOptions {
   judgments: JudgmentResult[];
   /** Decision 23: checks that were remediated since the last full audit. */
   remediatedChecks?: string[];
+  preJudgmentReportPath?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +148,7 @@ export async function finalizeMilestoneCloseAudit(
     milestone,
     judgments,
     remediatedChecks = [],
+    preJudgmentReportPath,
   } = options;
 
   // Step 1: Build detection actions from judgments
@@ -201,13 +203,26 @@ export async function finalizeMilestoneCloseAudit(
 
   appendDetection(statePath, detection);
 
-  // Step 3: Persist finalized report (overwrite pre-judgment)
-  // We need to reconstruct candidates and prompts from judgments + read pre-judgment
+  // Step 3: Read pre-judgment report for candidate data
+  let preJudgmentChecks: Layer2ReportCheck[] = [];
+  const resolvedPath = preJudgmentReportPath ?? join(projectPath, milestone, 'audit', 'milestone-close-layer2.json');
+  try {
+    const raw = await readFile(resolvedPath, 'utf-8');
+    const preReport = JSON.parse(raw) as Layer2Report;
+    if (preReport.checks) {
+      preJudgmentChecks = preReport.checks;
+    }
+  } catch {
+    // Missing or invalid pre-judgment report — proceed with empty candidates
+  }
+
+  // Step 4: Persist finalized report (overwrite pre-judgment)
   const report = buildFinalizedReport(
     projectPath,
     milestone,
     judgments,
     notReVerifiedNotice,
+    preJudgmentChecks,
   );
 
   const auditDir = join(projectPath, milestone, 'audit');
@@ -270,15 +285,27 @@ function buildFinalizedReport(
   milestone: string,
   judgments: JudgmentResult[],
   notReVerifiedNotice?: string,
+  preJudgmentChecks?: Layer2ReportCheck[],
 ): Layer2Report {
-  const checks: Layer2ReportCheck[] = judgments.map((j) => ({
-    check: j.checkName,
-    candidateCount: 0, // Not available in finalize phase
-    candidates: [],
-    prompt: '',
-    judgment: j.judgment,
-    hasFindings: j.hasFindings,
-  }));
+  const preMap = new Map<string, Layer2ReportCheck>();
+  if (preJudgmentChecks) {
+    for (const c of preJudgmentChecks) {
+      preMap.set(c.check, c);
+    }
+  }
+
+  const checks: Layer2ReportCheck[] = judgments.map((j) => {
+    const pre = preMap.get(j.checkName);
+    return {
+      check: j.checkName,
+      candidateCount: pre?.candidateCount ?? 0,
+      candidates: pre?.candidates ?? [],
+      context: pre?.context,
+      prompt: pre?.prompt ?? '',
+      judgment: j.judgment,
+      hasFindings: j.hasFindings,
+    };
+  });
 
   const report: Layer2Report = {
     version: REPORT_VERSION,

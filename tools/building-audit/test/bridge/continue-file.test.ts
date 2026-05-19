@@ -16,7 +16,7 @@ function makePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
     stageName: 'Build',
     halted: false,
     haltReason: null,
-    overrides: [],
+    stageOverrides: [],
     completedTasks: [],
     currentTask: null,
     remainingTasks: [],

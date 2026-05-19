@@ -124,7 +124,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport([result]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.classified).toHaveLength(1);
     expect(output.classified[0].checkName).toBe('test-cheat');
@@ -149,7 +149,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [result], secretLocations: secrets });
     mockBuildReport.mockReturnValue(makeReport([result]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.secretLocations).toEqual(secrets);
     expect(output.report).toBeDefined();
@@ -160,7 +160,7 @@ describe('runPostTaskAudit', () => {
     const report = makeReport([]);
     mockBuildReport.mockReturnValue(report);
 
-    await runPostTaskAudit(tempDir, 'm1-test', 42);
+    await runPostTaskAudit(tempDir, 'm1-test', 42, null);
 
     const reportPath = join(tempDir, 'm1-test', 'audit', 'task-42-layer1.json');
     expect(existsSync(reportPath)).toBe(true);
@@ -177,7 +177,7 @@ describe('runPostTaskAudit', () => {
     const auditDir = join(tempDir, 'm1-test', 'audit');
     expect(existsSync(auditDir)).toBe(false);
 
-    await runPostTaskAudit(tempDir, 'm1-test', 1);
+    await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(existsSync(auditDir)).toBe(true);
   });
@@ -192,7 +192,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: cleanResults, secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport(cleanResults));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.classified).toHaveLength(0);
   });
@@ -226,7 +226,7 @@ describe('runPostTaskAudit', () => {
     });
     mockBuildReport.mockReturnValue(makeReport([errorResult, okResult]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     // The errored check should not appear in classified (status != completed)
     // but the function should not throw
@@ -270,7 +270,7 @@ describe('runPostTaskAudit', () => {
     });
     mockBuildReport.mockReturnValue(makeReport([l1Result, csbResult, skippedL2]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     // clean-slate-bias with info severity should be classified
     expect(output.classified).toHaveLength(1);
@@ -298,7 +298,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport([result]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.classified).toHaveLength(1);
     expect(output.classified[0].tier).toBe(3);
@@ -323,7 +323,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport([result]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.classified).toHaveLength(1);
     expect(output.classified[0].action).toBe('generate-task');
@@ -338,7 +338,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [], secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport([]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     expect(output.classified).toHaveLength(0);
     expect(output.report).toBeDefined();
@@ -365,7 +365,7 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport([result]));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     // info severity on scope-creep is still classified (non-clean)
     expect(output.classified).toHaveLength(1);
@@ -386,9 +386,49 @@ describe('runPostTaskAudit', () => {
     mockRunChecks.mockResolvedValue({ results: skippedResults, secretLocations: [] });
     mockBuildReport.mockReturnValue(makeReport(skippedResults));
 
-    const output = await runPostTaskAudit(tempDir, 'm1-test', 1);
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
 
     // All skipped L2 checks should be filtered out
     expect(output.classified).toHaveLength(0);
+  });
+
+  // BF-001: reworkOf triggers depth-based escalation
+  it('BF-001: reworkOf non-null escalates remediation task findings to tier 3', async () => {
+    const finding = { file: 'src/redo.ts', location: 'line 1', description: 'Issue', suggestion: 'Fix' };
+    const result = makeCheckResult({
+      name: 'test-cheat',
+      layer: 1,
+      severity: 'warning',
+      findings: [finding],
+    });
+
+    mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
+    mockBuildReport.mockReturnValue(makeReport([result]));
+
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, 'task-003');
+
+    expect(output.classified).toHaveLength(1);
+    expect(output.classified[0].tier).toBe(3);
+    expect(output.classified[0].action).toBe('escalate');
+  });
+
+  // BF-002: reworkOf null keeps normal policy
+  it('BF-002: reworkOf null follows normal tier 2 policy', async () => {
+    const finding = { file: 'src/normal.ts', location: 'line 1', description: 'Issue', suggestion: 'Fix' };
+    const result = makeCheckResult({
+      name: 'test-cheat',
+      layer: 1,
+      severity: 'warning',
+      findings: [finding],
+    });
+
+    mockRunChecks.mockResolvedValue({ results: [result], secretLocations: [] });
+    mockBuildReport.mockReturnValue(makeReport([result]));
+
+    const output = await runPostTaskAudit(tempDir, 'm1-test', 1, null);
+
+    expect(output.classified).toHaveLength(1);
+    expect(output.classified[0].tier).toBe(2);
+    expect(output.classified[0].action).toBe('generate-task');
   });
 });

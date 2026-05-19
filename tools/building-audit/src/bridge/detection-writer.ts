@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync } from 'fs';
 import type { Detection } from './types.js';
 
+/**
+ * Append a detection to state.json. When `fileReference` is provided, the string
+ * is stored instead of the Detection object, producing a mixed-type
+ * `Array<Detection | string>` (see `DetectionEntry`). Consumers must use
+ * `isDetectionObject()` before accessing Detection-specific fields.
+ */
 export function appendDetection(
   statePath: string,
   detection: Detection,

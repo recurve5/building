@@ -22,6 +22,7 @@ export async function runPostTaskAudit(
   projectPath: string,
   milestone: string,
   taskId: number,
+  reworkOf: string | null,
 ): Promise<{
   report: AuditReport;
   classified: ClassifiedFinding[];
@@ -58,16 +59,18 @@ export async function runPostTaskAudit(
   });
 
   // Step 6: Classify non-clean, completed findings
+  // Inline depth computation mirrors getRemediationDepth (Decision D13)
+  const remediationDepth = reworkOf !== null ? 1 : 0;
   const classified: ClassifiedFinding[] = [];
   for (const result of filteredResults) {
     if (result.status !== 'completed') continue;
     if (result.severity === 'clean') continue;
 
     for (const finding of result.findings) {
-      const { tier, action } = classifyFinding(
+      const { tier, action, source } = classifyFinding(
         result.name,
         result.severity,
-        0, // remediationDepth: 0 for original tasks
+        remediationDepth,
         'task-complete',
       );
       classified.push({
@@ -76,6 +79,7 @@ export async function runPostTaskAudit(
         finding,
         tier,
         action,
+        source,
       });
     }
   }

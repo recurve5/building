@@ -4,7 +4,13 @@
   "description": "Build system audit tool for multi-agent orchestration projects",
   "type": "module",
   "bin": {
-    "building-audit": "./dist/bin/building-audit.js"
+    "building-audit": "./dist/bin/building-audit.js",
+    "building-audit-handoff-write": "./dist/bin/bridge/handoff-write.js",
+    "building-audit-handoff-read": "./dist/bin/bridge/handoff-read.js",
+    "building-audit-post-task-audit": "./dist/bin/bridge/post-task-audit.js",
+    "building-audit-milestone-close-prepare": "./dist/bin/bridge/milestone-close-prepare.js",
+    "building-audit-milestone-close-finalize": "./dist/bin/bridge/milestone-close-finalize.js",
+    "building-audit-write-event": "./dist/bin/bridge/write-event.js"
   },
   "scripts": {
     "build": "tsc",

@@ -242,6 +242,7 @@ describe('INT-001: Full post-task audit flow — clean project', () => {
       tmpDir,
       'm1-test',
       1,
+      null,
     );
 
     // No classified findings
@@ -307,7 +308,7 @@ describe('INT-002: Tier 2 finding generates task and detection record', () => {
       secretLocations: [],
     });
 
-    const { classified } = await runPostTaskAudit(tmpDir, 'm1-test', 3);
+    const { classified } = await runPostTaskAudit(tmpDir, 'm1-test', 3, null);
 
     // Should have one classified finding
     expect(classified).toHaveLength(1);
@@ -388,12 +389,12 @@ describe('INT-003: Tier 3 finding blocks and records', () => {
       secretLocations: [],
     });
 
-    const { classified } = await runPostTaskAudit(tmpDir, 'm1-test', 5);
+    const { classified } = await runPostTaskAudit(tmpDir, 'm1-test', 5, null);
 
     expect(classified).toHaveLength(1);
     expect(classified[0].checkName).toBe('premature-abstraction');
     expect(classified[0].tier).toBe(3);
-    expect(classified[0].action).toBe('block');
+    expect(classified[0].action).toBe('escalate');
 
     // Record blocked detection
     const detection: Detection = {
@@ -743,5 +744,62 @@ describe('INT-007: Report file is valid Layer2Report JSON', () => {
     expect(state.detections[0].actions).toHaveLength(1);
     expect(state.detections[0].actions[0].type).toBe('accepted');
     expect(state.detections[0].actions[0].resolution).toContain('clean');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SF-001: Prepare then finalize preserves candidate data
+// ---------------------------------------------------------------------------
+
+describe('SF-001: Prepare then finalize preserves candidate data', () => {
+  it('finalized entries have candidateCount > 0 and candidates populated', async () => {
+    const checks = LAYER2_CHECK_NAMES.map((name) => makeMockCheck(name));
+    mockGetChecks.mockReturnValue(checks);
+
+    await prepareMilestoneCloseAudit(tmpDir, 'm1-test');
+
+    const judgments: JudgmentResult[] = LAYER2_CHECK_NAMES.map((name) => ({
+      checkName: name,
+      judgment: `Clean for ${name}.`,
+      hasFindings: false,
+    }));
+
+    const { report } = await finalizeMilestoneCloseAudit({
+      statePath,
+      projectPath: tmpDir,
+      milestone: 'm1-test',
+      judgments,
+    });
+
+    expect(report.phase).toBe('finalized');
+    for (const check of report.checks) {
+      expect(check.candidateCount).toBeGreaterThan(0);
+      expect(check.candidates.length).toBeGreaterThan(0);
+      expect(check.judgment).toBeDefined();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SF-002: Finalize without prior prepare degrades gracefully
+// ---------------------------------------------------------------------------
+
+describe('SF-002: Finalize without prior prepare degrades gracefully', () => {
+  it('candidateCount is 0, candidates empty, no exception', async () => {
+    const judgments: JudgmentResult[] = [
+      { checkName: 'ghost-refactor', judgment: 'Clean.', hasFindings: false },
+    ];
+
+    const { report } = await finalizeMilestoneCloseAudit({
+      statePath,
+      projectPath: tmpDir,
+      milestone: 'm1-test',
+      judgments,
+    });
+
+    expect(report.checks).toHaveLength(1);
+    expect(report.checks[0].candidateCount).toBe(0);
+    expect(report.checks[0].candidates).toEqual([]);
+    expect(report.checks[0].judgment).toBe('Clean.');
   });
 });

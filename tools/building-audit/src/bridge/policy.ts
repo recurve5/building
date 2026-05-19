@@ -2,11 +2,11 @@
 // XRD Section 6, Decisions 14, 15, 19, 21.
 
 import type { CheckResult } from '../types/index.js';
+import type { ClassifiedFinding } from './types.js';
 
 export type Tier = 1 | 2 | 3;
 
-// Decision 21: 'fix-and-retry' removed — dead type with no policy entry or behavior.
-export type Action = 'generate-task' | 'block' | 'escalate';
+export type Action = 'generate-task' | 'escalate';
 
 export type AuditTrigger = 'task-complete' | 'milestone-close';
 
@@ -140,28 +140,23 @@ export function classifyFinding(
   severity: CheckResult['severity'],
   remediationDepth: number,
   trigger: AuditTrigger,
-): { tier: Tier; action: Action } {
-  // Remediation recursion limit: any finding on a remediation task -> Tier 3
+): { tier: Tier; action: Action; source: ClassifiedFinding['source'] } {
   if (remediationDepth >= MAX_REMEDIATION_DEPTH) {
-    return { tier: 3, action: 'escalate' };
+    return { tier: 3, action: 'escalate', source: 'depth_limit' };
   }
 
   const entry = POLICY_TABLE[checkName];
   if (!entry) {
-    // Unknown check: default to Tier 3 (safe default, Decision 15)
-    return { tier: 3, action: 'escalate' };
+    return { tier: 3, action: 'escalate', source: 'unknown_check' };
   }
 
-  // clean-slate-bias runs in mechanical mode per-task but is Layer 2.
-  // Per-task: Tier 2 (informational). Milestone-close: Tier 3 (Decision 14).
   if (checkName === 'clean-slate-bias' && trigger === 'task-complete') {
-    return { tier: 2, action: 'generate-task' };
+    return { tier: 2, action: 'generate-task', source: 'policy_default' };
   }
 
-  // Contextual checks: severity critical promotes to Tier 3
   if (entry.contextual && severity === 'critical') {
-    return { tier: 3, action: 'block' };
+    return { tier: 3, action: 'escalate', source: 'contextual_promotion' };
   }
 
-  return { tier: entry.tier, action: entry.action };
+  return { tier: entry.tier, action: entry.action, source: 'policy_default' };
 }

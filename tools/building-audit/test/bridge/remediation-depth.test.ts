@@ -51,7 +51,7 @@ describe('Remediation Depth Tracker', () => {
     // test-cheat is normally Tier 2 / generate-task.
     // At depth 1 (>= MAX_REMEDIATION_DEPTH), it should escalate to Tier 3.
     const classification = classifyFinding('test-cheat', 'warning', depth, 'task-complete');
-    expect(classification).toEqual({ tier: 3, action: 'escalate' });
+    expect(classification).toEqual({ tier: 3, action: 'escalate', source: 'depth_limit' });
   });
 
   // REM-011: Depth tracker follows Rework-of chain correctly

@@ -51,7 +51,7 @@ function renderBody(payload: HandoffPayload, truncate: boolean): string {
     `- **Stage:** ${payload.stage} — ${payload.stageName}\n` +
     `- **Halted:** ${payload.halted}` +
     (payload.halted && payload.haltReason ? ` (${payload.haltReason})` : '') + '\n' +
-    `- **Overrides:** ${payload.overrides.length > 0 ? payload.overrides.join(', ') : 'none'}`,
+    `- **Overrides:** ${payload.stageOverrides.length > 0 ? payload.stageOverrides.map(o => `Stage ${o.stage}: ${o.reason}`).join('; ') : 'none'}`,
   );
 
   // 3. Task Progress
@@ -70,7 +70,7 @@ function renderBody(payload: HandoffPayload, truncate: boolean): string {
 
     const remediationStr = payload.remediationTasks.length > 0
       ? payload.remediationTasks
-          .map((t, i) => `${i + 1}. Task ${t.number} — ${t.shortName} (${t.status})`)
+          .map((t, i) => `${i + 1}. Task ${t.number} — ${t.shortName} (${t.status}, from task ${t.originatingTask})`)
           .join('\n')
       : '_None_';
 
@@ -113,9 +113,15 @@ function renderBody(payload: HandoffPayload, truncate: boolean): string {
     let auditStr: string;
     if (payload.auditSummary) {
       const s = payload.auditSummary;
+      const l1Detail = s.l1Findings.length > 0
+        ? s.l1Findings.map(f => `  - Task ${f.taskId}: ${f.check} → ${f.action} (${f.filePath})`).join('\n')
+        : '  _None_';
+      const l2Detail = s.l2Findings.length > 0
+        ? s.l2Findings.map(f => `  - ${f.check} → ${f.action}`).join('\n')
+        : '  _None_';
       auditStr =
-        `- **L1 Findings:** ${s.l1Findings}\n` +
-        `- **L2 Findings:** ${s.l2Findings}\n` +
+        `- **L1 Findings** (${s.l1Findings.length}):\n${l1Detail}\n` +
+        `- **L2 Findings** (${s.l2Findings.length}):\n${l2Detail}\n` +
         `- **Detection Files:** ${s.detectionFiles.length > 0 ? s.detectionFiles.join(', ') : 'none'}`;
     } else {
       auditStr = '_No audit run this session._';
@@ -126,7 +132,7 @@ function renderBody(payload: HandoffPayload, truncate: boolean): string {
   // 7. Git Checkpoints
   {
     const checkpointsStr = payload.gitCheckpoints.length > 0
-      ? payload.gitCheckpoints.map(c => `- ${c}`).join('\n')
+      ? payload.gitCheckpoints.map(c => `- ${c.type}: ${c.ref}`).join('\n')
       : '_None_';
     sections.push(`## 7. Git Checkpoints\n\n${checkpointsStr}`);
   }
