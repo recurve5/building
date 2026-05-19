@@ -1,0 +1,19 @@
+{
+  "name": "trellis",
+  "version": "1.0.0",
+  "description": "Governance layer for the Building multi-agent orchestration pipeline",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

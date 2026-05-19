@@ -100,6 +100,20 @@ This is a **Tier 3 decision** — the orchestrator surfaces it to the human with
 
 **The refactoring assessment is not discretionary.** When the signals above appear in the data you're reviewing (completed tasks, escalations, codebase state), you must assess and report. Do not wait for the orchestrator to ask. The orchestrator triggers you at defined points; the assessment is your responsibility at every trigger.
 
+## Structural Review Checklist
+
+When reviewing a milestone's implementation, assess the following items. Items are conditional -- skip any that do not apply to the milestone, but document why they were skipped.
+
+1. **Dependency direction.** Do new modules depend only on modules from prior milestones or the current milestone? Flag any forward references (imports from not-yet-built modules or planned-but-unimplemented interfaces).
+
+2. **Interface-contract stability.** If the milestone introduces or modifies public types, do they match the DAY-ZERO contract? If field names differ from the contract, is every rename logged as a Tier 2 decision? Check for: renamed fields, flattened structures (object became primitive), dropped fields, added fields not in the contract.
+
+3. **Test scalability.** Will the test approach work at 10x the current task/file count? Does each test create fixtures proportional to the thing being tested, or does it require a full project scaffold for every case? Flag test patterns that will become expensive.
+
+4. **I/O model fit.** If a module is called by the orchestrator via subprocess, does it have a reachable CLI entry point? If it is called in-process, does it avoid unnecessary filesystem I/O? Flag modules with mismatched I/O expectations.
+
+An SDM review that checks all four items and finds no issues is a valid review. An SDM review that skips items without stating why is incomplete.
+
 ## Failure Modes You Watch For
 
 - **Architecture Mirror:** Is the proposed architecture mirroring the output structure rather than the creation process? Do component names map to output headings?
