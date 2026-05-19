@@ -164,6 +164,38 @@ For bug fixes originating from smoke test failures or single-issue corrections, 
 [Date, deviations, insight/implication — same as the full template. Not optional.]
 ```
 
+## Implementation Decisions Audit Variant
+
+For the penultimate task in every milestone (before the final test verification):
+
+```markdown
+# Task [NUMBER]: Implementation Decisions Audit
+
+**Track:** D (Final Audit)
+**Status:** not started
+**Depends on:** all implementation tasks in Tracks A, B, C
+**Context:**
+- Defaults: project CLAUDE.md, DECISIONS.md, DAY-ZERO.md
+- Task-specific: XRD (type specifications), DAY-ZERO.md (contract field names), all source files modified in the milestone
+
+## What to Build
+
+Read the diff between the XRD/DAY-ZERO type specifications and the actual implementation in source code. For every field-name divergence, structural change, or dropped field:
+
+1. If the change is intentional and harmless -- log as a Tier 2 decision in DECISIONS.md with rationale.
+2. If the change lost information or broke a downstream contract -- flag as a bug for a fix task.
+
+Source of truth: the DAY-ZERO contract. The implementation may ratify changes to the contract, but every ratification must be logged.
+
+## Acceptance Criteria
+
+1. Every type in the DAY-ZERO contract has been compared against the actual implementation.
+2. Every divergence is either logged as a Tier 2 decision or flagged as a bug.
+3. DECISIONS.md is updated with any new ratifications.
+```
+
+**Convention for inline logging:** Implementation-time Tier 2 decisions should be logged in the task's Completed section immediately during execution, not deferred to the audit task. The audit task consolidates any that were missed.
+
 ## Conventions
 
 - **Dependency gate (hard).** A task whose dependencies are not all marked `done` cannot begin execution. The agent does not attempt to resolve the dependency — it reports the block and stops. This is enforced by the Peer Reviewer (see `prompts/peer-review-agent.md`, Orchestration) and is a hard gate, not a suggestion.

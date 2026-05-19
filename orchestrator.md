@@ -28,6 +28,8 @@ Each stage has an agent, inputs, outputs, and a gate. You advance to the next st
 
 ## Pipeline Continuity
 
+At session start, before beginning or resuming the pipeline, check for `<state-dir>/current-run`. If the file exists, an active run is in progress — resume via the handoff-read protocol in "Session Management > Structured Handoff." If the file does not exist, this is a fresh run — proceed to run directory creation in "Run Lifecycle."
+
 The pipeline runs end to end unless the human says otherwise or a blocking Tier 3 item requires a decision. After each gate passes, advance to the next stage. This includes the transition from Stage 8 (Task Decomposition) to Stage 9 (Build) and from Stage 9 (Build) to Stage 10 (Smoke Test). Do not wait for human confirmation between stages unless you are stopped by a gate failure or a blocking Tier 3 item.
 
 The pipeline runs per milestone, not per brief. After Stage 0 decomposes the brief into milestones, Stages 1-10 execute for each milestone in sequence. The next milestone does not begin until the current milestone's smoke test passes. This means integration problems surface at the first milestone, when the blast radius is smallest and the fix is cheapest.
@@ -297,10 +299,24 @@ Most items that arrive labeled Tier 3 become Tier 2 when forced through this len
 
 After each agent returns output, you verify the gate before advancing.
 
-### Mechanical Checks (you run these yourself)
+### Mechanical Checks (verified by the post-task audit CLI)
+
+The following checks are run by the post-task audit CLI after each Stage 9 task completes. See "Post-Task Audit Integration" below for the invocation protocol. You do not run these checks yourself. You invoke the CLI and branch on its output.
+
+- Scope compliance: did the task modify only files in its scope?
+- Test cheat: are tests asserting real behavior or faking passes?
+- Dependency grab: were dependencies added without justification?
+- Confidence bluff: did the agent claim success without evidence?
+- Surface heresy: do names and references match documented decisions?
+- Premature abstraction: were abstractions created before the second use case?
+- Resource drain: are there unbounded allocations or missing cleanup?
+
+### Document-Level Checks (you run these yourself)
+
+These checks remain your responsibility. The audit CLI does not run them.
+
 - Section count: does the document have all required sections? For UI products: PRD must include First-Use Walkthrough; peer review must include User-Experience Gaps.
 - Reference integrity: does every task reference only DAY-ZERO contracts?
-- Scope compliance: were only files in the task's Files section modified?
 - Test execution: did all tests actually pass (verified by output, not self-report)?
 - Completed section: present, with date, deviations, and insight/implication?
 - Directory check: does the milestone directory exist? If not, create it before any agent writes to it. Verify all agent output for this milestone is written to the correct milestone directory.
@@ -316,6 +332,106 @@ These are not document reviews. You are checking whether the agent engaged serio
 - For UI products: did the peer reviewer independently walk the user journey before reading the PRD? Does the review include a User-Experience Gaps comparison?
 
 When a gate fails, you tell the agent what's missing and spin it back up with the specific deficiency. You do not advance and fix it later.
+
+## Post-Task Audit Integration
+
+After each Stage 9 task completes, invoke the post-task audit CLI before advancing to the next task:
+
+    echo '{"projectPath":"/path/to/project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+
+**Stdin payload:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| projectPath | string | yes | Path to the product repo (PROJECT_DIR) |
+| milestone | string | yes | Milestone directory name (e.g., `m1-nacre-docx-ingestion`) |
+| taskId | number | yes | Task number |
+| reworkOf | string or null | yes | Original task ID if this is a remediation task, null otherwise |
+
+**Stdout response:** A JSON object with `{ "classified": ClassifiedFinding[], "secretLocationCount": number }`.
+
+**Branching on the result:**
+
+- **`classified` is empty (clean audit):** Advance to the next task.
+- **Any item has `"action": "generate-task"`:** A remediation task is needed. The response includes a `RemediationTaskSpec`. Write it as a task file in the state directory's `tasks/` folder and route it through Stage 9 with the original task ID as `reworkOf`.
+- **Any item has `"action": "escalate"`:** Halt the pipeline. Surface to the human with: the check name, the affected files, the finding detail, and the action options (fix and resubmit, override with rationale, or abort).
+
+**`reworkOf` chaining rule:** Always pass the original task ID, not the remediation task ID. If remediation task R1 was created for task 003, and R1 also fails audit, the next remediation passes `reworkOf: "003"` (not `reworkOf: "R1"`). This ensures the depth counter increments correctly for the depth limit.
+
+**Error handling:** If the CLI exits with a non-zero code, halt the pipeline. A failed audit invocation is not a clean audit — do not treat it as "no findings." Report: the CLI name, the error message from stderr, the current stage, and the current task.
+
+**Detection persistence:** The CLI handles detection persistence internally. It writes audit report files to `<projectPath>/<milestone>/audit/`. No separate detection-write step is needed after this invocation.
+
+**Example — clean audit:**
+
+    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+    # stdout: {"classified":[],"secretLocationCount":0}
+    # → classified is empty, advance to next task
+
+**Example — remediation needed:**
+
+    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+    # stdout: {"classified":[{"check":"scope_compliance","tier":2,"action":"generate-task","detail":"Files modified outside task scope: src/utils/helpers.ts"}],"secretLocationCount":0}
+    # → action is "generate-task", create remediation task with reworkOf:"003"
+
+## Milestone-Close Audit Integration
+
+After all Stage 9 tasks pass their gates and before Stage 9.5 (security code review), run the Layer 2 audit. This is a gate in the Stage 9 to 9.5 transition, not a separate pipeline stage.
+
+### Phase 1: Prepare
+
+Invoke the milestone-close prepare CLI:
+
+    echo '{"projectPath":"/path/to/project","milestone":"m1-nacre-docx-ingestion"}' | npx building-audit-milestone-close-prepare
+
+**Stdin payload:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| projectPath | string | yes | Path to the product repo (PROJECT_DIR) |
+| milestone | string | yes | Milestone directory name |
+
+**Stdout response:** `{ "checkCount": number, "promptCount": number, "errorCount": number }` — counts only. The actual candidates and judgment prompts are written to disk.
+
+**If `checkCount` is 0:** No Layer 2 candidates. Skip Phase 2 and advance to Stage 9.5.
+
+**If `checkCount` > 0:** Read the candidates file from disk at:
+
+    <projectPath>/<milestone>/audit/milestone-close-layer2.json
+
+This file contains the Layer 2 candidates (ghost refactor, deep heresy, clean-slate bias, performance critical path, refactoring signals) and formatted judgment prompts for each candidate.
+
+### Phase 2: Judge and Finalize
+
+For each check in the report's `checks` array:
+
+1. Read the `prompt` field — this is the judgment prompt for that check.
+2. Evaluate the prompt. Layer 2 checks require your judgment: read code in context, assess whether patterns are intentional or accidental, determine whether refactors were warranted.
+3. Form a `JudgmentResult` for each check: `{ "checkName": string, "judgment": string, "hasFindings": boolean }`.
+
+After forming all judgments, invoke the finalize CLI:
+
+    echo '<json>' | npx building-audit-milestone-close-finalize
+
+**Finalize stdin payload:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| statePath | string | yes | Governance state directory (PROJECT_STATE) |
+| projectPath | string | yes | Path to the product repo (PROJECT_DIR) |
+| milestone | string | yes | Milestone directory name |
+| judgments | JudgmentResult[] | yes | Your judgments for each check |
+| remediatedChecks | string[] | yes | Check names that have been remediated (empty on first pass) |
+
+Note: finalize uses `statePath` (the state directory root), not `runDir`.
+
+**Gate behavior after finalize:**
+
+- **No candidates (from Phase 1):** Advance to Stage 9.5.
+- **Candidates, no critical findings after judgment:** Advance to Stage 9.5. The finalized report is the record.
+- **Critical findings after judgment:** Each critical finding becomes a remediation task. Route it through Stage 9 (where it goes through the Post-Task Audit). After remediation completes, re-run the milestone-close audit from Phase 1. This loop terminates when no critical findings remain or an escalation halts the pipeline.
+
+**Error handling:** Same as Post-Task Audit — non-zero exit halts the pipeline.
 
 ## Decision Consolidation
 
@@ -394,6 +510,129 @@ Then write a **What the Next Session Should Do** section in the project CLAUDE.m
 - **After fixes:** [what to run — e.g., "rerun Stage 10, all steps" or "run test suite, then rerun Stage 10"]
 
 The fix instructions must be surgical. File paths, line numbers, field names, and a reference to working code that demonstrates the pattern. A session that starts with "investigate why the flashcard page doesn't load" costs 30 minutes. A session that starts with "in src/components/Flashcard.tsx line 42, change `chessComId` to `username` — see ProfilePage.tsx line 18 for the correct field access pattern" costs 5 minutes.
+
+### Structured Handoff
+
+In addition to CLAUDE.md, write a structured handoff file at every session boundary. The handoff file serves the orchestrator at session resumption; CLAUDE.md serves the human. Both are produced.
+
+**Write path (session ending):**
+
+Before writing CLAUDE.md, invoke the handoff-write CLI:
+
+    echo '<json>' | npx building-audit-handoff-write
+
+**Stdin payload:** `{ "runDir": "<state-dir>/runs/<run-id>", "payload": <HandoffPayload> }`
+
+**HandoffPayload fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| runId | string | Current run ID |
+| project | string | Project name |
+| milestone | string | Milestone name |
+| projectDir | string | Product repo path (PROJECT_DIR) |
+| stateDir | string | Governance state directory (PROJECT_STATE) |
+| stage | number | Current pipeline stage |
+| stageName | string | Stage name (e.g., "Build") |
+| halted | boolean | Whether the pipeline is halted |
+| haltReason | string or null | Reason for halt |
+| stageOverrides | string[] | Overridden stage numbers |
+| completedTasks | { number, shortName, status }[] | Tasks completed this run |
+| currentTask | { number, shortName, status } or null | Task in progress |
+| remainingTasks | { number, shortName, status }[] | Tasks not yet started |
+| remediationTasks | { number, shortName, status }[] | Remediation tasks |
+| decisions | { number, decision, rationale }[] | Decisions made this session |
+| openItems | string[] | Unresolved Tier 3 items |
+| auditSummary | { l1Findings, l2Findings, detectionFiles } | Audit state |
+| gitCheckpoints | string[] | Commit hashes at stage boundaries |
+| artifactPaths | string[] | Paths to key output files |
+| nextStep | string | What the next session should do first |
+
+The CLI writes to `<run-dir>/handoff.md`. Confirm exit 0, then write CLAUDE.md as before.
+
+**Read path (session starting):**
+
+1. Check for `<state-dir>/current-run`. If the file does not exist, this is a fresh run — proceed to "Run Lifecycle" below.
+2. Read the run ID from `current-run`.
+3. Invoke the handoff-read CLI:
+
+       echo '{"runDir":"<state-dir>/runs/<run-id>"}' | npx building-audit-handoff-read
+
+4. **Stdout:** HandoffHeader — `{ runId, project, milestone, stage, stageName, halted, taskCounts: { completed, remaining, remediation }, nextStep }`.
+5. Resume from the recorded stage and task.
+
+**If the handoff file is missing:** `current-run` exists but `handoff.md` is not in the run directory. Report the gap to the human. Fall back to CLAUDE.md and event files in the run directory. Do not guess state — surface the inconsistency.
+
+**If `current-run` points to a missing run directory:** Report the orphaned reference. The human deletes `current-run` and starts fresh.
+
+**Continue signal:** The handoff file's existence with a non-complete stage is the continue signal. No separate continue file is needed. The `continue` file that the handoff-write CLI creates is a vestige of M3 Decision D16 — ignore it.
+
+## Run Lifecycle
+
+### Run Start
+
+At the beginning of a new run (no `current-run` file exists):
+
+1. **Generate run ID.** Format: `YYYYMMDDTHHMMZ-<7-char-hex>`. Example: `20260519T1430Z-a3b7c9e`. If the run directory already exists (collision), generate a new hex suffix.
+
+2. **Create run directory structure:**
+
+       mkdir -p <state-dir>/runs/<run-id>/events
+       mkdir -p <state-dir>/runs/<run-id>/gates
+
+3. **Initialize state.json.** If `<state-dir>/state.json` does not exist, create it with `{ "detections": [] }`. This file is a precondition for the milestone-close-finalize CLI.
+
+4. **Write `current-run`.** Write the run ID to `<state-dir>/current-run` (plain text, single line). This file signals that a run is active and allows session resumption to locate the run directory.
+
+### Event Logging
+
+At four pipeline transitions, invoke the event writer:
+
+    echo '<json>' | npx building-audit-write-event
+
+**Stdin payload:** `{ "runDir": "<state-dir>/runs/<run-id>", "eventType": "<type>", "payload": { ... } }`
+
+**Run start event:**
+
+    echo '{"runDir":"<run-dir>","eventType":"run_started","payload":{"brief":"milestones/trellis/m1-brief.md","projectDir":"/path/to/project","milestones":["m1-nacre-docx-ingestion"]}}' | npx building-audit-write-event
+
+**Task completion event:**
+
+    echo '{"runDir":"<run-dir>","eventType":"task_completed","payload":{"taskId":"003","milestone":"m1-nacre-docx-ingestion","auditResult":"proceed","escalatedCheck":null}}' | npx building-audit-write-event
+
+The `auditResult` is `"proceed"` (clean or Tier 1 only), `"generate-task"` (remediation created), or `"escalate"` (halted). The `escalatedCheck` is null for clean audits and contains the check name when `auditResult` is `"escalate"`.
+
+**Session boundary event:**
+
+    echo '{"runDir":"<run-dir>","eventType":"session_boundary","payload":{"reason":"context_window","stage":9,"lastTask":"003"}}' | npx building-audit-write-event
+
+Valid reasons: `"context_window"`, `"planned_pause"`, `"interruption"`.
+
+**Run completion event:**
+
+    echo '{"runDir":"<run-dir>","eventType":"run_completed","payload":{"result":"success","summary":"All 12 tasks passed. 2 remediation tasks generated and resolved."}}' | npx building-audit-write-event
+
+Valid results: `"success"`, `"halted"`, `"failed"`.
+
+Events capture the pipeline timeline. They are the raw material for the morning-after summary. Escalations are detection records (persisted by the audit CLIs internally). Gate results are in the audit output. Events record what happened when, not the details of what was found.
+
+### Morning-After Summary
+
+At run end, read event files from `<run-dir>/events/` and audit report files from `<projectPath>/<milestone>/audit/` (per-task Layer 1 reports and the milestone-close Layer 2 report). Assemble a summary in `<run-dir>/morning-after.md` answering:
+
+1. **What happened?** Timeline of tasks, audit results, session boundaries.
+2. **What was found?** Audit findings grouped by check type, severity, and action taken.
+3. **What needs attention?** Escalations, remediation tasks generated, open items.
+
+### Run Completion
+
+Three steps, in this order:
+
+1. Write the `run_completed` event.
+2. Write the morning-after summary.
+3. Delete `<state-dir>/current-run`.
+
+The deletion of `current-run` is the signal that the run is complete.
 
 ## What You Do Not Do
 

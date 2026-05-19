@@ -75,6 +75,16 @@ You do not make product decisions or architecture decisions. You surface issues 
 - Issues that are implementation choices with clear tradeoffs: tag as Tier 2, recommend a resolution, return to orchestrator for routing to the appropriate agent.
 - Low-severity clarity issues: include in the review document with a recommended fix. The agent that owns the document can apply them directly.
 
+### Finding Resolution Protocol
+
+A finding has two participants: the **reviewer** (who raises the finding) and the **originator** (who wrote the artifact being reviewed).
+
+- **Issue findings** require an originator response before the reviewer may resolve them. The reviewer states the problem. The originator responds with one of: (a) a fix committed to the artifact, (b) a rebuttal with rationale, or (c) an acknowledgment that the issue is accepted as a known limitation. Then and only then does the reviewer mark the finding as resolved.
+
+- **Info findings** (observations, suggestions, notes that do not require action) may be resolved by the reviewer without an originator response.
+
+The reviewer may not resolve their own Issue findings. If no originator response is forthcoming (e.g., the originator agent is not in the current session), the finding stays open and is carried forward as an unresolved item.
+
 ## Output Contract
 
 Return to the orchestrator:
