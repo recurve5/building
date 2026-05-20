@@ -14,11 +14,11 @@ const mockScanProject = vi.fn<
 const mockGetChecks = vi.fn<(layer?: 1 | 2) => Check[]>();
 
 vi.mock('../../src/scanner/project-scanner.js', () => ({
-  scanProject: (...args: any[]) => mockScanProject(...args),
+  scanProject: (...args: unknown[]) => mockScanProject(...(args as [any])),
 }));
 
 vi.mock('../../src/checks/registry.js', () => ({
-  getChecks: (...args: any[]) => mockGetChecks(...args),
+  getChecks: (...args: unknown[]) => mockGetChecks(...(args as [any])),
   registerCheck: vi.fn(),
   clearRegistry: vi.fn(),
 }));

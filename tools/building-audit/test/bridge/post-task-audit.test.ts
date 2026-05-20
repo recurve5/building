@@ -17,22 +17,22 @@ const mockRunChecks = vi.fn<
   (context: ProjectContext, mode: 'mechanical' | 'full') => Promise<{ results: CheckResult[]; secretLocations: SecretLocation[] }>
 >();
 const mockBuildReport = vi.fn<
-  (...args: any[]) => AuditReport
+  (...args: unknown[]) => AuditReport
 >();
 
 vi.mock('../../src/scanner/project-scanner.js', () => ({
-  scanProject: (...args: any[]) => mockScanProject(...args),
+  scanProject: (...args: unknown[]) => mockScanProject(...(args as [any])),
 }));
 
 vi.mock('../../src/checks/registry.js', () => ({
-  runChecks: (...args: any[]) => mockRunChecks(...args),
+  runChecks: (...args: unknown[]) => mockRunChecks(...(args as [any, any])),
   registerCheck: vi.fn(),
   getChecks: vi.fn(() => []),
   clearRegistry: vi.fn(),
 }));
 
 vi.mock('../../src/report/json-builder.js', () => ({
-  buildReport: (...args: any[]) => mockBuildReport(...args),
+  buildReport: (...args: unknown[]) => mockBuildReport(...(args as [any])),
 }));
 
 // Mock register-checks to avoid importing actual check modules
