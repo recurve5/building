@@ -88,7 +88,7 @@ If you cannot formulate a question that requires product judgment, the issue is 
 Every milestone gets its own directory named `m<number>-<project>-<goal>/`. The folder structure is self-documenting — browsing the project tells you what was built and when.
 
 ```
-m1-nacre-docx-ingestion/
+m1-recipebook-ingredient-parser/
   PRD.md, XRD.md, peer-review.md, test-plan.md
   security-review.md, security-code-review.md
   smoke-test-report.md

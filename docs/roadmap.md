@@ -32,7 +32,7 @@ Open design questions for the building system, extracted from the original north
 
 **Question:** When does a decision graduate to a tenet? What's the mechanism for recognizing that a decision has been tested across enough projects and never challenged? Who decides, and what's the format for the tenet layer?
 
-**What exists today:** `decisions.md` has a Foundational Tenets tier and `CLAUDE.md` has core principles. Decisions 20, 21, 22 were elevated to the tenets tier manually after the Nacre 0.5 build cycle. The Tier 3 Pattern Review in `orchestrator.md` describes the Tier 3 → Tier 2 promotion but not the Tier 2 → tenet promotion.
+**What exists today:** `decisions.md` has a Foundational Tenets tier and `CLAUDE.md` has core principles. Decisions 20, 21, 22 were elevated to the tenets tier manually after an early build cycle. The Tier 3 Pattern Review in `orchestrator.md` describes the Tier 3 → Tier 2 promotion but not the Tier 2 → tenet promotion.
 
 **What would trigger building it:** Three or more projects produce the same Tier 2 decision independently. At that point the decision is a tenet — it's been tested across contexts and consistently held. The trigger is pattern recognition across the decisions logs of multiple projects.
 

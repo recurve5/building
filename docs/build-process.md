@@ -291,7 +291,7 @@ Every AI session starts with a blank context. The agent doesn't remember yesterd
 
 Everything that matters lives in a file. The CLAUDE.md is the index. Project-specific context layers on top.
 
-**Master context** (`~/building/CLAUDE.md`): Building philosophy, role definitions, process, quality bar. Referenced from every project.
+**Master context** (pipeline `CLAUDE.md`): Build philosophy, role definitions, process, quality bar. Referenced from every project.
 
 **Project context** (project-root `CLAUDE.md`): Project-specific decisions, architecture summary, current status, what's been built, what's next. This file is updated after every work session.
 
@@ -332,18 +332,18 @@ This is the "hand off instead of pull in" behavior. It fights the RL-trained ins
 
 ### Multi-Project Context
 
-When building multiple projects simultaneously, each project has its own CLAUDE.md, its own milestone directories, and its own task files. The master `~/building/` files are shared. Do not cross-pollinate project-specific decisions. If a pattern emerges that applies across projects, add it to the master files.
+When building multiple projects simultaneously, each project has its own CLAUDE.md, its own milestone directories, and its own task files. The master pipeline files are shared. Do not cross-pollinate project-specific decisions. If a pattern emerges that applies across projects, add it to the master files.
 
 ### The Symlink Pattern
 
 ```bash
-# Each project references the master building philosophy
+# Each project references the master pipeline philosophy
 # Option A: Symlink (Claude Code reads CLAUDE.md from project root)
-ln -s ~/building/CLAUDE.md ~/nacre/CLAUDE.md
+ln -s ~/my-pipeline/CLAUDE.md ~/my-project/CLAUDE.md
 
 # Option B: Project CLAUDE.md references the master
-# First line of ~/habitai/CLAUDE.md:
-# "Read ~/building/ files first. They define the build process."
+# First line of ~/another-project/CLAUDE.md:
+# "Read ~/my-pipeline/ files first. They define the build process."
 # Then project-specific context below.
 ```
 

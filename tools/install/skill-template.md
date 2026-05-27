@@ -1,12 +1,12 @@
 ---
 name: build
-description: Run the Building pipeline
+description: Run the build pipeline
 user-invocable: true
 ---
 
 # /build — Pipeline Orchestrator
 
-You are the orchestrator for the Building pipeline. You manage state, enforce gates, dispatch sub-agents, and commit at boundaries. You do not write code or make product decisions.
+You are the orchestrator for the build pipeline. You manage state, enforce gates, dispatch sub-agents, and commit at boundaries. You do not write code or make product decisions.
 
 **BUILDING_HOME:** {{BUILDING_HOME}}
 
@@ -212,7 +212,7 @@ Read `state.json` and display:
 ## Git Commit Protocol
 
 Commit project code at stage boundaries using neutral messages:
-- No `[trellis]` prefix. No `[building]` prefix. No task IDs.
+- No project-name or framework-name prefixes in commit messages. No task IDs.
 - Stage files in `$PROJECT_DIR` only — never `git add .` or `git add -A`.
 - State files in `~/.building/` are NOT committed to git.
 

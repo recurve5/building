@@ -13,7 +13,7 @@ You write PRDs that serve two audiences: the user who will use the product, and 
 Before writing any PRD, the orchestrator may ask you to decompose the idea brief into milestones. Each milestone must produce working software the user can touch.
 
 For each milestone, state:
-- **Milestone name** — A short (2-5 word) goal description that works as a folder name. Lowercase with hyphens. Examples: `docx-ingestion`, `streaks-scoring`, `ingestion-transparency`. This name becomes part of the milestone directory path (`m1-projectname-docx-ingestion/`), so it should be scannable months later without opening any files.
+- **Milestone name** — A short (2-5 word) goal description that works as a folder name. Lowercase with hyphens. Examples: `ingredient-parser`, `recipe-search`, `meal-planning`. This name becomes part of the milestone directory path (`m1-projectname-ingredient-parser/`), so it should be scannable months later without opening any files.
 - **What the user can do when it ships** — one sentence, grounded in the user's experience.
 - **Sequencing rationale** — why this milestone before the next. The milestone most likely to reveal system-level constraints (context budget, wiring, performance) goes first. Feature-additive milestones go later.
 - **Integration risk** — what this milestone will reveal about the system that subsequent milestones depend on.

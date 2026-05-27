@@ -41,7 +41,7 @@ If the context window is approaching capacity before Stage 9, state what has bee
 Before writing any PRD, the brief is decomposed into milestones. Spin up product-agent with the idea brief and this instruction: "Decompose this brief into milestones. Each milestone must produce working software the user can touch."
 
 Rules for milestones:
-- **Each milestone is independently valuable to the user.** "Nacre can read .docx files" is a milestone. "Nacre can read .docx, .xlsx, .pptx, resize images, and report ingestion status" is not — that's a brief containing multiple milestones.
+- **Each milestone is independently valuable to the user.** "The app can parse ingredient lists" is a milestone. "The app can parse ingredients, search recipes, plan meals, resize images, and generate shopping lists" is not — that's a brief containing multiple milestones.
 - **Milestones are sequenced so integration problems surface early.** The milestone most likely to reveal system-level constraints (budget, performance, wiring) goes first. Infrastructure-stressing milestones go before feature-additive ones.
 - **Each milestone gets a smoke test.** The user (or automated observer) verifies the milestone works against the running product before the next milestone starts.
 - **Simple briefs skip this stage.** If the brief describes a single deliverable that can't be meaningfully decomposed — a bug fix, a single feature, a configuration change — Stage 0 produces one milestone equal to the brief. Do not manufacture artificial milestones for work that's naturally atomic.
@@ -62,18 +62,18 @@ Every milestone gets its own directory. The directory name includes the project 
 
 **Examples:**
 ```
-m1-nacre-docx-ingestion/
-m2-nacre-xlsx-support/
-m3-nacre-ingestion-transparency/
+m1-recipebook-ingredient-parser/
+m2-recipebook-recipe-search/
+m3-recipebook-meal-planning/
 
-m1-habitai-core-tracking/
-m2-habitai-streaks-scoring/
-m3-habitai-weekly-review/
+m1-weatherly-data-dashboard/
+m2-weatherly-alert-system/
+m3-weatherly-forecast-comparison/
 ```
 
 **What goes in the milestone directory:**
 ```
-m1-nacre-docx-ingestion/
+m1-recipebook-ingredient-parser/
   PRD.md                    # This milestone's PRD
   XRD.md                    # This milestone's XRD
   peer-review.md            # Peer review document
@@ -96,7 +96,7 @@ m1-nacre-docx-ingestion/
 - `OPEN-ITEMS.md` — Project-level open items.
 - Source code directories (`src/`, `lib/`, etc.) — code lives where the codebase puts it, not in milestone directories.
 
-**For simple briefs (single milestone):** The directory is still created. The naming convention still applies. A single-milestone project produces one directory like `m1-nacre-bug-fix-parser/`. This maintains consistency — every project's history is readable from its folder structure, whether it had one milestone or ten.
+**For simple briefs (single milestone):** The directory is still created. The naming convention still applies. A single-milestone project produces one directory like `m1-recipebook-bug-fix-parser/`. This maintains consistency — every project's history is readable from its folder structure, whether it had one milestone or ten.
 
 **After a milestone completes:** The milestone directory is a permanent record. Do not move, rename, or archive it. The folder structure is the project's build history. When the SDM runs post-milestone reassessment, it reads the completed milestone's directory for context.
 
@@ -336,22 +336,20 @@ When a gate fails, you tell the agent what's missing and spin it back up with th
 
 ### Namespace Isolation
 
-Building is a pipeline that builds user projects. Building also has its own PRDs, XRDs, and milestone artifacts (e.g., the trellis milestone). Gate checks must never confuse Building's own artifacts with the user project's artifacts.
-
-Concretely: when checking a user project's PRD for required sections, derive the expected sections from the PRD spec in product-agent.md — not from any PRD that happens to exist in the Building repo. If a gate check finds itself comparing a user project's document against section names that belong to Building's own milestones, that is a namespace collision. Fail the gate and report the collision rather than trying to rationalize the mismatch.
+When checking a document for required sections, derive the expected sections from the agent prompt spec (e.g., product-agent.md §3 for PRDs) — not from any specific project's artifacts. If a gate check finds itself comparing a document against section names from a different project or from the pipeline's own documentation, that is a namespace collision. Fail the gate and report the collision rather than trying to rationalize the mismatch.
 
 ## Post-Task Audit Integration
 
 After each Stage 9 task completes, invoke the post-task audit CLI before advancing to the next task:
 
-    echo '{"projectPath":"/path/to/project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+    echo '{"projectPath":"/path/to/project","milestone":"m1-recipebook-ingredient-parser","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
 
 **Stdin payload:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | projectPath | string | yes | Path to the product repo (PROJECT_DIR) |
-| milestone | string | yes | Milestone directory name (e.g., `m1-nacre-docx-ingestion`) |
+| milestone | string | yes | Milestone directory name (e.g., `m1-recipebook-ingredient-parser`) |
 | taskId | number | yes | Task number |
 | reworkOf | string or null | yes | Original task ID if this is a remediation task, null otherwise |
 
@@ -371,13 +369,13 @@ After each Stage 9 task completes, invoke the post-task audit CLI before advanci
 
 **Example — clean audit:**
 
-    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-recipebook-ingredient-parser","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
     # stdout: {"classified":[],"secretLocationCount":0}
     # → classified is empty, advance to next task
 
 **Example — remediation needed:**
 
-    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-nacre-docx-ingestion","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
+    echo '{"projectPath":"/Users/dev/my-project","milestone":"m1-recipebook-ingredient-parser","taskId":3,"reworkOf":null}' | npx building-audit-post-task-audit
     # stdout: {"classified":[{"check":"scope_compliance","tier":2,"action":"generate-task","detail":"Files modified outside task scope: src/utils/helpers.ts"}],"secretLocationCount":0}
     # → action is "generate-task", create remediation task with reworkOf:"003"
 
@@ -389,7 +387,7 @@ After all Stage 9 tasks pass their gates and before Stage 9.5 (security code rev
 
 Invoke the milestone-close prepare CLI:
 
-    echo '{"projectPath":"/path/to/project","milestone":"m1-nacre-docx-ingestion"}' | npx building-audit-milestone-close-prepare
+    echo '{"projectPath":"/path/to/project","milestone":"m1-recipebook-ingredient-parser"}' | npx building-audit-milestone-close-prepare
 
 **Stdin payload:**
 
@@ -516,7 +514,7 @@ Then write a **What the Next Session Should Do** section in the project CLAUDE.m
 - **Fix instructions:** [file paths with line numbers, exact fields or code to change, reference implementations to follow]
 - **After fixes:** [what to run — e.g., "rerun Stage 10, all steps" or "run test suite, then rerun Stage 10"]
 
-The fix instructions must be surgical. File paths, line numbers, field names, and a reference to working code that demonstrates the pattern. A session that starts with "investigate why the flashcard page doesn't load" costs 30 minutes. A session that starts with "in src/components/Flashcard.tsx line 42, change `chessComId` to `username` — see ProfilePage.tsx line 18 for the correct field access pattern" costs 5 minutes.
+The fix instructions must be surgical. File paths, line numbers, field names, and a reference to working code that demonstrates the pattern. A session that starts with "investigate why the dashboard page doesn't load" costs 30 minutes. A session that starts with "in src/components/Dashboard.tsx line 42, change `legacyUserId` to `accountId` — see Settings.tsx line 18 for the correct field access pattern" costs 5 minutes.
 
 ### Structured Handoff
 
@@ -601,11 +599,11 @@ At four pipeline transitions, invoke the event writer:
 
 **Run start event:**
 
-    echo '{"runDir":"<run-dir>","eventType":"run_started","payload":{"brief":"milestones/trellis/m1-brief.md","projectDir":"/path/to/project","milestones":["m1-nacre-docx-ingestion"]}}' | npx building-audit-write-event
+    echo '{"runDir":"<run-dir>","eventType":"run_started","payload":{"brief":"milestones/m1-recipebook-ingredient-parser/brief.md","projectDir":"/path/to/project","milestones":["m1-recipebook-ingredient-parser"]}}' | npx building-audit-write-event
 
 **Task completion event:**
 
-    echo '{"runDir":"<run-dir>","eventType":"task_completed","payload":{"taskId":"003","milestone":"m1-nacre-docx-ingestion","auditResult":"proceed","escalatedCheck":null}}' | npx building-audit-write-event
+    echo '{"runDir":"<run-dir>","eventType":"task_completed","payload":{"taskId":"003","milestone":"m1-recipebook-ingredient-parser","auditResult":"proceed","escalatedCheck":null}}' | npx building-audit-write-event
 
 The `auditResult` is `"proceed"` (clean or Tier 1 only), `"generate-task"` (remediation created), or `"escalate"` (halted). The `escalatedCheck` is null for clean audits and contains the check name when `auditResult` is `"escalate"`.
 

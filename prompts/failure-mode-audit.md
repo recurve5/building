@@ -1,6 +1,6 @@
 # Failure Mode Audit
 
-You are auditing a completed build for the failure modes documented in `~/building/docs/agent-failure-modes.md`. You are not fixing anything. You are producing a report.
+You are auditing a completed build for the failure modes documented in `docs/agent-failure-modes.md`. You are not fixing anything. You are producing a report.
 
 ## How to Run This
 

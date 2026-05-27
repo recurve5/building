@@ -14,7 +14,7 @@ Josh encoded judgment first. Every stage of the build process has a quality gate
 >
 > **Implication:** The harness already has the judgment encoding (decision tiers, failure modes, quality bar, role definitions). The next evolution is an automation layer that lets encoded judgment run without Josh, and stops when it encounters something the encoding doesn't cover.
 >
-> **Decision:** Build automation into `~/building/` as described below. Do not automate any stage that lacks a defined quality gate and a testable definition of done.
+> **Decision:** Build automation into the pipeline as described below. Do not automate any stage that lacks a defined quality gate and a testable definition of done.
 
 ## The Principle
 
