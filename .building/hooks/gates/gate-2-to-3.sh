@@ -12,7 +12,10 @@ PRD="$MILESTONE_DIR/PRD.md"
 check_file_exists "prd-exists" "$PRD" "PRD.md"
 
 if [ -f "$PRD" ]; then
-  for section in "Overview" "Gate Enforcement" "State Persistence" "Morning-After" "Bootstrap" "Decisions"; do
+  # Canonical PRD sections from product-agent.md. All 10 are always required;
+  # inapplicable sections still have the heading with justification.
+  # "Feature Sections" is excluded — those have project-specific names.
+  for section in "Overview" "Visual Design Language" "Screen Inventory" "First-Use Walkthrough" "Data Model" "Non-Functional Requirements" "Technical Constraints" "Out of Scope" "Decisions"; do
     if grep -qi "^#.*$section" "$PRD" 2>/dev/null; then
       check "prd-section-$section" "pass" ""
     else

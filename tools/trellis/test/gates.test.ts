@@ -128,7 +128,7 @@ describe("gate-1-to-2", () => {
 });
 
 describe("gate-2-to-3", () => {
-  const PRD_CONTENT = `# Overview\nStuff\n# Gate Enforcement\nStuff\n# State Persistence\nStuff\n# Morning-After Summary\nStuff\n# Bootstrap and Handoff\nStuff\n# Decisions Log\nStuff\n`;
+  const PRD_CONTENT = `# Overview\nStuff\n# Visual Design Language\nStuff\n# Screen Inventory\nStuff\n# First-Use Walkthrough\nStuff\n# Feature: Core Feature\nStuff\n# Data Model\nStuff\n# Non-Functional Requirements\nStuff\n# Technical Constraints\nStuff\n# Out of Scope\nStuff\n# Decisions Log\nStuff\n`;
 
   it("GATE-007: passes with complete PRD", () => {
     const { runDir, milestoneDir } = makeFixture();

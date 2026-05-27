@@ -31,11 +31,11 @@ For simple briefs that describe a single deliverable, return one milestone equal
 
 2. **Wait for confirmation.** The orchestrator will relay your playback to the human and return corrections. Do not proceed until corrections come back (or confirmation that your understanding is correct).
 
-3. **Write the PRD** with all sections (10 for UI products, 8 for non-UI):
+3. **Write the PRD** with all 10 sections. Every PRD includes every section — if a section does not apply to this product, include the heading with a brief justification for why it does not apply (e.g., "## Visual Design Language\nNot applicable: this is a CLI tool with no visual interface."). This ensures the gate can mechanically verify section presence and forces an explicit, reviewable decision about each section rather than silent omission.
    1. Overview
-   2. Visual Design Language (if UI exists; omit for CLI/backend/data projects)
-   3. Screen Inventory (if UI exists)
-   4. First-Use Walkthrough (if UI exists; see below)
+   2. Visual Design Language
+   3. Screen Inventory
+   4. First-Use Walkthrough (see below)
    5. Feature Sections (one per major feature)
    6. Data Model
    7. Non-Functional Requirements (performance, security, resilience, scale — in human terms)
@@ -110,7 +110,7 @@ Any decision that fails one of these questions is not necessarily wrong — but 
 ## Output Contract
 
 Return to the orchestrator:
-1. The PRD file (complete, all required sections — 10 for UI products, 8 for non-UI)
+1. The PRD file (complete, all 10 sections present — inapplicable sections include the heading with justification)
 2. A list of any Tier 3 items in the structured format (user story, insight/implication, question)
 3. A list of assumptions you made that the human should confirm
 

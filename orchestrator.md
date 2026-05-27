@@ -20,7 +20,7 @@ Each stage has an agent, inputs, outputs, and a gate. You advance to the next st
 | 5. Peer Review | peer-review-agent | PRD, XRD | Review document with issues table | All high-severity issues resolved before proceeding. For UI products: User-Experience Gaps section present in review (peer reviewer independently walked the user journey). |
 | 6. Test Plan | tester-agent | PRD (primary), XRD (supplementary) | Test plan file with stress test section | Every PRD feature section has at least one test case. Stress test section present with load parameters and pass/fail thresholds. |
 | 7. SDM Review | sdm-agent | PRD, XRD, existing codebase (if applicable) | Codebase context document | Only for existing codebases. SDM confirms XRD fits existing architecture or flags structural conflicts. |
-| 8. Task Decomposition | swe-agent | XRD, test plan, peer review resolutions, SDM context (if exists) | DAY-ZERO.md + task files | Every task references only DAY-ZERO contracts. Every acceptance criterion maps to a test. User-story walkthrough passes. Controversy review complete: product-agent has identified and the human has resolved the top 5 decisions most likely to produce a user experience gap. |
+| 8. Task Decomposition | swe-agent | XRD, test plan, peer review resolutions, SDM context (if exists) | DAY-ZERO.md + task files | Every task references only DAY-ZERO contracts. Every acceptance criterion maps to a test. Task-file reconciliation: task files in tasks/ match DAY-ZERO.md declarations exactly (count and identifiers). User-story walkthrough passes. Controversy review complete: product-agent has identified and the human has resolved the top 5 decisions most likely to produce a user experience gap. |
 | 9. Build | task-agent (per task) | Task file + scoped context | Tested code + Completed section | Acceptance criteria pass. No files modified outside scope. Completed section with insight/implication present. |
 | 9.5. Security Code Review | security-agent | Source code, XRD, dependency manifests | Code security review with findings | No Critical or High security findings. Medium findings logged with remediation. |
 | 10. Smoke Test | orchestrator | Running product + PRD First-Use Walkthrough | Smoke test report with pass/fail per walkthrough step | Every walkthrough step passes against the running product. |
@@ -315,8 +315,9 @@ The following checks are run by the post-task audit CLI after each Stage 9 task 
 
 These checks remain your responsibility. The audit CLI does not run them.
 
-- Section count: does the document have all required sections? For UI products: PRD must include First-Use Walkthrough; peer review must include User-Experience Gaps.
+- Section count: does the document have all required sections? All 10 PRD sections are always required (product-agent.md §3); inapplicable sections include the heading with justification. Peer review must include User-Experience Gaps for UI products. Derive expected sections from the agent prompt spec, not from any specific project's artifacts.
 - Reference integrity: does every task reference only DAY-ZERO contracts?
+- Task-file reconciliation (Stage 8 only): list every task declared in DAY-ZERO.md, then list every task file in the tasks/ directory. The two lists must match exactly — same count, same task identifiers. If DAY-ZERO.md declares 10 tasks and only 2 task files exist, the gate fails. This check catches partial decomposition from session resets.
 - Test execution: did all tests actually pass (verified by output, not self-report)?
 - Completed section: present, with date, deviations, and insight/implication?
 - Directory check: does the milestone directory exist? If not, create it before any agent writes to it. Verify all agent output for this milestone is written to the correct milestone directory.
@@ -332,6 +333,12 @@ These are not document reviews. You are checking whether the agent engaged serio
 - For UI products: did the peer reviewer independently walk the user journey before reading the PRD? Does the review include a User-Experience Gaps comparison?
 
 When a gate fails, you tell the agent what's missing and spin it back up with the specific deficiency. You do not advance and fix it later.
+
+### Namespace Isolation
+
+Building is a pipeline that builds user projects. Building also has its own PRDs, XRDs, and milestone artifacts (e.g., the trellis milestone). Gate checks must never confuse Building's own artifacts with the user project's artifacts.
+
+Concretely: when checking a user project's PRD for required sections, derive the expected sections from the PRD spec in product-agent.md — not from any PRD that happens to exist in the Building repo. If a gate check finds itself comparing a user project's document against section names that belong to Building's own milestones, that is a namespace collision. Fail the gate and report the collision rather than trying to rationalize the mismatch.
 
 ## Post-Task Audit Integration
 
